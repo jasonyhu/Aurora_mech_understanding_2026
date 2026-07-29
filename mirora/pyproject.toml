@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirora"
+version = "0.1.0"
+description = "Mechanistic Interpretability for the Aurora foundation model (MIRORA). Tools for running inference, training sparse autoencoders, and analyzing the AuroraAirPollution weather/air-pollution model."
+requires-python = ">=3.12"
+license = "MIT"
+
+keywords = [
+    "mechanistic interpretability",
+    "sparse autoencoder",
+    "earth system science",
+    "foundation models",
+    "air pollution",
+    "weather prediction",
+]
+
+authors = [
+    {name = "Jason Hu", email = "hujason@stanford.edu"},
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "numpy",
+    "torch",
+    "xarray",
+    "microsoft-aurora",
+    "scikit-learn",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+viz = ["matplotlib", "cartopy", "Pillow"]
+data = ["cdsapi", "netCDF4", "pandas"]
+all = ["mirora[viz,data]"]
+
+[project.urls]
+Repository = "https://github.com/jasonyhu/Aurora_mech_understanding_2026"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mirora = ["py.typed"]

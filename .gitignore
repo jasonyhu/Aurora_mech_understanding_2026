@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Job logs and caches
+logs/
+*.out
+*.err
+.cache/
+
+# Model artifacts and data (fetched by the scripts, never committed)
+*.ckpt
+*.pt
+*.pickle
+*.nc
