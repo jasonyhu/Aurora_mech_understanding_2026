@@ -8,12 +8,14 @@ data_end_time = datetime(2023, 5, 31, 12)
 val_start_time = datetime(2022, 6, 1, 0)
 val_end_time   = datetime(2023, 5, 31, 12)  # inclusive
 
-def _storage_root(override_var: str, base_var: str, subpath: str) -> Path:
+def _storage_root(override_var: str, base_var: str, subpath: str,
+                  default: Path | None = None) -> Path:
     """Resolve a storage root from env vars, with no hardcoded user/group paths.
 
     Uses ``$<override_var>`` if set (treated as the full mirora root); otherwise
     ``$<base_var>/<subpath>``. On Sherlock ``$SCRATCH`` and ``$OAK`` are defined
-    automatically, so this works for any user without editing.
+    automatically, so this works for any user without editing. If neither is set
+    and a ``default`` is supplied, the default is used.
     """
     override = os.environ.get(override_var)
     if override:
@@ -21,14 +23,20 @@ def _storage_root(override_var: str, base_var: str, subpath: str) -> Path:
     base = os.environ.get(base_var)
     if base:
         return Path(base) / subpath
+    if default is not None:
+        return default
     raise EnvironmentError(
         f"Set ${override_var} to your MIRORA storage root "
         f"(on Sherlock ${base_var} is set automatically)."
     )
 
-# Storage roots — override on a non-Sherlock system via MIRORA_SCRATCH / MIRORA_OAK.
+# Working storage. This is the only variable you need to set:
+#   export MIRORA_SCRATCH=/somewhere/with/space/mirora
 SCRATCH_PATH = _storage_root("MIRORA_SCRATCH", "SCRATCH", "mirora")
-OAK_PATH = _storage_root("MIRORA_OAK", "OAK", "MLchem/mirora")
+
+# Optional second tier. On Sherlock this is the OAK archive; everywhere else it
+# simply falls back to the working storage, so a single-tier setup just works.
+OAK_PATH = _storage_root("MIRORA_OAK", "OAK", "MLchem/mirora", default=SCRATCH_PATH)
 
 MODEL_PATH       = SCRATCH_PATH / "model"
 CAMS_DATA_PATH   = SCRATCH_PATH / "cams_forecasts"
