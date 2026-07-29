@@ -78,7 +78,7 @@ python3 mirora/scripts/python/download_saes.py
 |---|---|---|
 | [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts) | Model inputs + evaluation baseline | Free Copernicus ADS account |
 | [Aurora Air Pollution checkpoint](https://huggingface.co/microsoft/aurora) | The model under study | Public, HuggingFace |
-| [FINN v2.5 fire emissions](https://rda.ucar.edu/) (NCAR GDEX) | Wildfire figure overlays | Free NCAR account |
+| [FINN v2.5 fire emissions](https://gdex.ucar.edu/) (NCAR GDEX) | Wildfire figure overlays | Free NCAR account |
 
 ## Citation
 

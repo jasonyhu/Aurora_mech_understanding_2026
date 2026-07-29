@@ -5,7 +5,6 @@
 ml python/3.12.1
 ml cuda/12.8.0
 ml ffmpeg/7.1
-ml claude-code/2.1.114
 
 # Export Hugging Face cache directory
 export HF_HOME=$SCRATCH/mirora/.cache

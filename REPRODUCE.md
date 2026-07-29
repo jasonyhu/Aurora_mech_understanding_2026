@@ -58,10 +58,14 @@ from mirora.setup.download_model import download_model_checkpoint as d; d(consts
 python3 mirora/scripts/python/download_saes.py
 ```
 
-**FINN fire emissions** (only needed for the wildfire figure):
+**FINN fire emissions** (only needed for the wildfire figure). Free NCAR GDEX
+account; the script prompts for an API token on first run and saves it to
+`~/.gdex_token`:
+
+- Get a token: https://gdex.ucar.edu/accounts/profile/
 
 ```bash
-python3 mirora/scripts/python/download_finn.py   # NCAR GDEX, needs ~/.gdex_token
+python3 mirora/scripts/python/download_finn.py
 ```
 
 ## 4. Fetch and process the data
