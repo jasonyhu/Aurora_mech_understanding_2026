@@ -1,11 +1,8 @@
 # Reproducing the manuscript figures
 
-Everything here is built from **public data**: CAMS global atmospheric-composition
-forecasts (Copernicus) and the public Aurora Air Pollution checkpoint. There is
-no private dataset to request.
+All data in the project is public: CAMS global atmospheric-composition forecasts (Copernicus) and the public Aurora Air Pollution checkpoint.
 
-Two scripts do all the work:
-
+There are two starter scripts to reproduce the figures of the paper:
 ```bash
 # 1. fetch + process the public data the figures need
 python3 mirora/scripts/python/prepare_figure_data.py --all
@@ -23,18 +20,13 @@ git clone https://github.com/jasonyhu/Aurora_mech_understanding_2026.git && cd A
 cd mirora && pip install -e ".[all]" && cd ..
 ```
 
-Python >= 3.12. The heavy dependency is `microsoft-aurora` (pulls in PyTorch).
-
 ## 2. Choose a storage location
 
-No paths are hardcoded. Set one environment variable:
+Set one environment variable:
 
 ```bash
-export MIRORA_SCRATCH=/somewhere/with/space/mirora   # needs ~60 GB
+export MIRORA_SCRATCH=/path/to/mirora   # needs ~60 GB
 ```
-
-On the Stanford Sherlock cluster, `$SCRATCH` and `$OAK` are picked up
-automatically — just `source spinup.sh`.
 
 ## 3. Credentials for the public data
 
@@ -46,19 +38,18 @@ automatically — just `source spinup.sh`.
 - Dataset used: [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts)
   (variables and lead times are set in `mirora/src/mirora/setup/download_cams.py`)
 
-**Aurora checkpoint and sparse autoencoders** (both public on HuggingFace, no key
-required):
+**Aurora checkpoint and sparse autoencoders**:
 
 ```bash
 # Aurora Air Pollution checkpoint (microsoft/aurora)
 python3 -c "import sys; sys.path.insert(0,'mirora/scripts/python'); import consts; \
 from mirora.setup.download_model import download_model_checkpoint as d; d(consts.MODEL_PATH)"
 
-# 48 trained sparse autoencoders (hujason/aurorascope)
+# download 48 trained sparse autoencoders (hujason/aurorascope)
 python3 mirora/scripts/python/download_saes.py
 ```
 
-**FINN fire emissions** (only needed for the wildfire figure). Free NCAR GDEX
+**FINN fire emissions**: create a free NCAR GDEX
 account; the script prompts for an API token on first run and saves it to
 `~/.gdex_token`:
 
@@ -75,18 +66,7 @@ python3 mirora/scripts/python/prepare_figure_data.py --list-inits   # what it wi
 python3 mirora/scripts/python/prepare_figure_data.py --all
 ```
 
-The figures depend on only **7 initialisation times**, not the full validation
-year, so this downloads 14 CAMS forecasts (each init also needs `t-12h`) rather
-than the whole archive. The stages are resumable and skip anything already
-present:
-
-| Stage | What it does | Cost |
-|---|---|---|
-| `cams` | Download the 14 required CAMS forecasts | ~17 GB; the CDS queue dominates |
-| `batches` | Build the Aurora `Batch` init objects | minutes, CPU |
-| `rollouts` | Base + NOx-perturbation + single-cell rollouts | ~30 min on one GPU |
-
-Run a single stage with `--steps cams`, and preview with `--dry-run`.
+The figures depend on only **7 initialisation times**, not the full validation year, so this downloads 14 CAMS forecasts (each init requires two timesteps).
 
 ## 5. Render the figures
 
@@ -114,13 +94,12 @@ reproduce_figures.py --dry-run --all
 | **2** | Figs 6–7 (SAE galleries) | A GPU — these run Aurora live to capture activations |
 | **3** | Fig 5 (PCA of backbone embeddings) | The full validation year, see below |
 
-Aurora runs out of memory on 11–12 GB cards. Use **>= 32 GB**, and set
+Use GPUs with **>= 32 GB** RAM, and set
 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`.
 
-**Why Fig 5 is different.** The PCA panels are computed over backbone embeddings
-for *every* rollout in the validation year — ~10.4 GB per initialisation across
-730 initialisations (~7.6 TB). `prepare_figure_data.py` deliberately does not
-attempt this. To reproduce that panel, run the full pipeline
+**Figure 5** The PCA panels are computed over backbone embeddings
+for every rollout in the validation year, which is ~10.4 GB per initialisation across
+730 initialisations (~7.6 TB). `prepare_figure_data.py` ignores this figure. To reproduce that panel, run the full pipeline
 (`mirora/scripts/README.md`): download the full CAMS year, build all init
 batches, then run `run_base_rollout.sh` with backbone activations enabled.
 

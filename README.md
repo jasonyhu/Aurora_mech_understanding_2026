@@ -9,11 +9,9 @@ Jason Y. Hu, Ivan Higuera-Mendieta, Patrick Obin Sturm, Makoto M. Kelp
 
 ## What this is
 
-We apply mechanistic interpretability methods — sparse autoencoders (SAEs) and
-PCA of internal representations — to Microsoft's
+We apply mechanistic interpretability methods — sparse autoencoders (SAEs) and PCA of internal representations — to Microsoft's
 [Aurora](https://github.com/microsoft/aurora) foundation model fine-tuned for
-atmospheric chemistry (Aurora Air Pollution), and probe its learned chemistry
-with targeted perturbation experiments:
+atmospheric chemistry (Aurora Air Pollution), and probe its learned chemistry with targeted perturbation experiments:
 
 - **NOx → ozone titration.** Uniform NOx perturbations (+0.5/+5/+20 ppb) reproduce
   the expected short-term ozone suppression under NOx-saturated conditions.
@@ -26,9 +24,7 @@ with targeted perturbation experiments:
 
 ## Reproducing the figures
 
-**→ [REPRODUCE.md](REPRODUCE.md)** is the full guide. Everything is built from
-public data (Copernicus CAMS forecasts + the public Aurora checkpoint); there is
-no private dataset to request.
+See **[REPRODUCE.md](REPRODUCE.md)**.
 
 ```bash
 cd mirora && pip install -e ".[all]" && cd ..
@@ -39,29 +35,13 @@ python3 mirora/scripts/python/reproduce_figures.py --check   # confirm inputs
 python3 mirora/scripts/python/reproduce_figures.py --all     # render every figure
 ```
 
-`reproduce_figures.py --list` shows every manuscript figure, which script builds
-it, and whether it needs a GPU.
-
-## Layout
-
-| Path | Contents |
-|---|---|
-| `mirora/src/mirora/` | The installable library: data loading, inference, SAEs, PCA, perturbation experiments, plotting |
-| `mirora/scripts/python/` | Entry-point scripts — see [`mirora/scripts/README.md`](mirora/scripts/README.md) |
-| `mirora/scripts/slurm/` | SLURM wrappers — see [`mirora/scripts/slurm/README.md`](mirora/scripts/slurm/README.md) |
-| `REPRODUCE.md` | Step-by-step figure reproduction |
-
-The library is importable directly:
+The library is also importable directly:
 
 ```python
 from mirora.interp import AuroraSAE, BatchTopKSAE
 from mirora.data import AuroraInitBatchesDataset
 from mirora.experiments import perturb_batch
 ```
-
-Model/grid constants live in one place (`mirora/src/mirora/config.py`); storage
-paths resolve from environment variables (`mirora/scripts/python/consts.py`), so
-nothing is hardcoded to a user or cluster.
 
 ## Trained sparse autoencoders
 
@@ -74,11 +54,11 @@ python3 mirora/scripts/python/download_saes.py
 
 ## Data sources
 
-| Source | Used for | Access |
-|---|---|---|
-| [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts) | Model inputs + evaluation baseline | Free Copernicus ADS account |
-| [Aurora Air Pollution checkpoint](https://huggingface.co/microsoft/aurora) | The model under study | Public, HuggingFace |
-| [FINN v2.5 fire emissions](https://gdex.ucar.edu/) (NCAR GDEX) | Wildfire figure overlays | Free NCAR account |
+| Source | Used for |
+|---|---|
+| [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts) | Model inputs + evaluation baseline |
+| [Aurora Air Pollution checkpoint](https://huggingface.co/microsoft/aurora) | The model under study |
+| [FINN v2.5 fire emissions](https://gdex.ucar.edu/) (NCAR GDEX) | Wildfire figure overlays |
 
 ## Citation
 

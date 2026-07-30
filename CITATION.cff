@@ -3,7 +3,7 @@ message: "If you use this software, please cite the paper below."
 title: "Toward Mechanistic Interpretability of an AI Foundation Model Fine-Tuned for Atmospheric Chemistry"
 authors:
   - family-names: "Hu"
-    given-names: "Jason Y."
+    given-names: "Jason Yuanheng"
   - family-names: "Higuera-Mendieta"
     given-names: "Ivan"
   - family-names: "Sturm"
@@ -17,7 +17,7 @@ preferred-citation:
   title: "Toward Mechanistic Interpretability of an AI Foundation Model Fine-Tuned for Atmospheric Chemistry"
   authors:
     - family-names: "Hu"
-      given-names: "Jason Y."
+      given-names: "Jason Yuanheng"
     - family-names: "Higuera-Mendieta"
       given-names: "Ivan"
     - family-names: "Sturm"
