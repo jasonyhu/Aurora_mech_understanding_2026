@@ -1,8 +1,10 @@
 """
-Generate 9 individual SAE feature visualization PDFs for thesis composite figure.
+Generate the SAE feature gallery: one map per selected feature, plus a tiled
+composite.
 
-Each PDF shows one specific feature from a specific backbone block. The user
-will tile them in a 3x3 grid in Illustrator manually.
+Each panel shows one feature from one backbone block. Individual per-feature
+PDFs are written alongside the composite so panels can be recomposed manually.
+The layout is driven by `PLOTS` and `GRID_NCOLS` below.
 
 Activations are normalized per-feature to [0, 1] using the feature's max
 activation on the running example (Sep 1 2022 00Z).
@@ -42,7 +44,7 @@ plt.rcParams.update({
 
 SAE_DIR = consts.MODEL_PATH / "sae"
 EXPANSION = 8
-OUT_DIR = consts.FIGURES_PATH / "sae_thesis_grid"
+OUT_DIR = consts.FIGURES_PATH / "sae_feature_grid"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Plot specs: (plot_num, component, stage_0idx, block_0idx, dim, feature_idx)
@@ -134,7 +136,7 @@ def main():
     for h in handles:
         h.remove()
 
-    # === Pass 1: compute per-token variance-contribution maps for all 9 plots ===
+    # === Pass 1: compute per-token variance-contribution maps for every plot ===
     # contrib_per_token[t] = h[t, k]² / ||x[t] - b_dec||²
     # (W_dec rows are unit-normalized, so this equals the fraction of token t's
     # input variance reconstructable from feature k alone.)
@@ -245,18 +247,18 @@ def main():
         # Only the bottom row shows the colorbar axis label.
         render_panel(ax, d, cbar_ax, show_cbar_label=(row == n_rows - 1))
 
-    composite_pdf = SUB_DIR / "thesis_3x3_grid.pdf"
+    composite_pdf = SUB_DIR / "sae_feature_grid.pdf"
     composite_png = composite_pdf.with_suffix(".png")
     plt.savefig(composite_pdf, dpi=300, bbox_inches="tight", facecolor="white")
     plt.savefig(composite_png, dpi=300, bbox_inches="tight", facecolor="white")
     # Also save to OUT_DIR (top-level) for convenient direct access.
-    out_pdf = OUT_DIR / "thesis_3x3_grid.pdf"
+    out_pdf = OUT_DIR / "sae_feature_grid.pdf"
     plt.savefig(out_pdf, dpi=300, bbox_inches="tight", facecolor="white")
     plt.savefig(out_pdf.with_suffix(".png"), dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     logger.info(f"\nComposite saved to {composite_pdf} and {out_pdf}")
 
-    # === Individual plot{1-9} figures ===
+    # === Individual per-feature figures ===
     for d in plot_data:
         plot_num = d["plot_num"]
         fig = plt.figure(figsize=(13, 6))

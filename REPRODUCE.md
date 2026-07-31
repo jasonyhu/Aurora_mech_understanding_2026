@@ -101,7 +101,7 @@ Use GPUs with **>= 32 GB** RAM, and set
 for every rollout in the validation year, which is ~10.4 GB per initialisation across
 730 initialisations (~7.6 TB). `prepare_figure_data.py` ignores this figure. To reproduce that panel, run the full pipeline
 (`mirora/scripts/README.md`): download the full CAMS year, build all init
-batches, then run `run_base_rollout.sh` with backbone activations enabled.
+batches, then run `run_base_rollout.py` with backbone activations enabled.
 
 ---
 
@@ -111,15 +111,16 @@ To rebuild everything from scratch — including SAE training and the embeddings
 behind Fig 5 — follow the numbered runbook in
 [`mirora/scripts/README.md`](mirora/scripts/README.md):
 
-1. `download_cams.sh` — the full CAMS validation year
-2. `save_init_batches.sh` — Aurora `Batch` objects
-3. `run_base_rollout.sh` — rollouts + backbone embeddings (the multi-TB step)
-4. `train_sae.sh` — train the 48 sparse autoencoders (~3 h each on one GPU)
+1. `download_cams.py` — the full CAMS validation year
+2. `save_init_batches.py` — Aurora `Batch` objects
+3. `run_base_rollout.py` — rollouts + backbone embeddings (the multi-TB step)
+4. `train_sae.py` — train the 48 sparse autoencoders (~3 h each on one GPU)
 5. `reproduce_figures.py --all`
 
-These are SLURM array jobs; see
-[`mirora/scripts/slurm/README.md`](mirora/scripts/slurm/README.md) for the
-one-time `logs/` setup and which directives are cluster-specific.
+Steps 1–4 shard their work across parallel tasks and take `<task_id> <task_ct>`
+as positional arguments — run them serially with `0 1`, or launch tasks
+`0..N-1` concurrently. No cluster job scripts are shipped: resource requests and
+scheduler directives are site-specific, so write your own wrappers.
 
 ---
 

@@ -4,16 +4,19 @@
 > need `prepare_figure_data.py` then `reproduce_figures.py`. This file documents
 > the individual scripts those two drive.
 
-Two layers:
+Everything in `python/` is an entry point: a thin script that parses CLI args,
+imports the `mirora` package and `consts.py` (storage paths), and calls library
+functions. Run them directly:
 
-- **`python/`** — entry points. Thin scripts that parse CLI args, import the
-  `mirora` package and `consts.py` (storage paths), and call library functions.
-- **`slurm/`** — SLURM wrappers that set resources, `source spinup.sh`, and run
-  the matching `python/` script. See [`slurm/README.md`](slurm/README.md) for the
-  one-time `logs/` setup and the cluster-specific directives.
+```bash
+python3 mirora/scripts/python/<name>.py
+```
 
-Scripts with a wrapper are submitted with `sbatch mirora/scripts/slurm/<name>.sh`;
-the rest run directly with `python3 mirora/scripts/python/<name>.py`.
+Scripts marked
+**array** below shard their work across `task_ct` parallel tasks and take
+`<task_id> <task_ct>` as positional arguments; run them serially with `0 1`, or
+launch tasks `0..N-1` concurrently. Scripts marked **GPU** run Aurora live and
+need >= 32 GB of GPU memory.
 
 ---
 
@@ -28,17 +31,17 @@ the rest run directly with `python3 mirora/scripts/python/<name>.py`.
 
 | Script | Run | Purpose |
 |---|---|---|
-| `download_cams` | [sbatch] | Download CAMS composition forecasts (array over dates) |
+| `download_cams` | array | Download CAMS composition forecasts (array over dates) |
 | `download_finn` | python | Download FINN v2.5 gridded fire emissions (NCAR GDEX) |
 | `download_saes` | python | Fetch the 48 trained SAEs from HuggingFace |
-| `save_init_batches` | [sbatch] | Build pickled Aurora `Batch` init objects from CAMS |
+| `save_init_batches` | array | Build pickled Aurora `Batch` init objects from CAMS |
 
 ## Model rollouts
 
 | Script | Run | Purpose |
 |---|---|---|
-| `run_base_rollout` | [sbatch] GPU | Base rollout; saves predictions + backbone embeddings |
-| `rerun_single_init_perturbations` | [sbatch] GPU | Base + NOx +0.5/+5/+20 ppb for the main init |
+| `run_base_rollout` | array, GPU | Base rollout; saves predictions + backbone embeddings |
+| `rerun_single_init_perturbations` | GPU | Base + NOx +0.5/+5/+20 ppb for the main init |
 | `run_fire_base_rollouts` | python GPU | Base rollouts for the wildfire case studies |
 | `run_single_cell_nox` | python GPU | Single-grid-cell NOx spike (SI) |
 
@@ -46,24 +49,23 @@ the rest run directly with `python3 mirora/scripts/python/<name>.py`.
 
 | Script | Run | Purpose |
 |---|---|---|
-| `train_sae` | [sbatch] GPU | Train one L1 SAE per backbone block (48-task array) |
-| `train_batch_topk_sae` | [sbatch] GPU | Train one BatchTopK SAE per block (48-task array) |
-| `compute_fve` | [sbatch] GPU | Fraction of variance explained, L1 SAEs |
-| `compute_fve_topk` | [sbatch] GPU | FVE + L0 sparsity, BatchTopK SAEs |
+| `train_sae` | array, GPU | Train one L1 SAE per backbone block (48-task array) |
+| `train_batch_topk_sae` | array, GPU | Train one BatchTopK SAE per block (48-task array) |
+| `compute_fve` | GPU | Fraction of variance explained, L1 SAEs |
+| `compute_fve_topk` | GPU | FVE + L0 sparsity, BatchTopK SAEs |
 
 ## Figures
 
 | Script | Run | Figure |
 |---|---|---|
 | `plot_architecture_diagram` | python | Model architecture |
-| `plot_chemistry_products` | [sbatch] | Leighton ratio + NOx ratio, CAMS vs Aurora |
+| `plot_chemistry_products` | python | Leighton ratio + NOx ratio, CAMS vs Aurora |
 | `plot_ozone_perturbation` | python | NOx → ozone response composite + KDEs |
-| `plot_fire_stills` | [sbatch] | Wildfire case studies (`--event`, `--var`) |
-| `run_pca_analysis` | [sbatch] | PCA of backbone embeddings |
-| `plot_sae_thesis_grid` | [sbatch] GPU | SAE feature gallery |
-| `plot_sae_examples` | [sbatch] GPU | SAE activation examples (6×2) |
+| `plot_fire_stills` | python | Wildfire case studies (`--event`, `--var`) |
+| `run_pca_analysis` | python | PCA of backbone embeddings |
+| `plot_sae_feature_grid` | GPU | SAE feature gallery |
+| `plot_sae_examples` | GPU | SAE activation examples (6×2) |
 | `plot_single_cell_nox` | python | Single-cell NOx spike maps (SI) |
-| `make_feature_count_table` | python | SAE dictionary-size table (SI, LaTeX) |
 
 ## Validation
 

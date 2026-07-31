@@ -126,10 +126,10 @@ FIGURES = [
         "output": consts.FIGURES_PATH / "pca_embeddings",
     },
     {
-        "id": "sae_thesis_grid",
+        "id": "sae_feature_grid",
         "paper": "Fig 6",
         "title": "SAE feature gallery (per-feature maps)",
-        "script": "plot_sae_thesis_grid.py",
+        "script": "plot_sae_feature_grid.py",
         "args": [],
         "tier": 2,
         "gpu": True,
@@ -138,7 +138,7 @@ FIGURES = [
             consts.BATCH_INITS_PATH / f"init_{MAIN_INIT}",
             consts.MODEL_PATH / "sae",
         ],
-        "output": consts.FIGURES_PATH / "sae_thesis_grid",
+        "output": consts.FIGURES_PATH / "sae_feature_grid",
     },
     {
         "id": "sae_examples",
@@ -156,17 +156,6 @@ FIGURES = [
         "output": consts.FIGURES_PATH / "sae_examples",
     },
     # ----- Supporting information -----
-    {
-        "id": "si_feature_counts",
-        "paper": "SI table",
-        "title": "SAE dictionary sizes per layer (LaTeX table)",
-        "script": "make_feature_count_table.py",
-        "args": [],
-        "tier": 1,
-        "gpu": False,
-        "inputs": [],  # derived from mirora.config
-        "output": consts.FIGURES_PATH / "si" / "sae_feature_counts.tex",
-    },
     {
         "id": "si_single_cell_nox",
         "paper": "SI",

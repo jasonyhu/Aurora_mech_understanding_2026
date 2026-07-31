@@ -1,5 +1,10 @@
-"""Train one L1 sparse autoencoder per backbone layer (SLURM array;
-task_id selects the layer, 0-23 encoder / 24-47 decoder)."""
+"""Train one L1 sparse autoencoder per backbone layer.
+
+`task_id` selects the layer (0-23 encoder, 24-47 decoder); run tasks 0..47
+under whatever scheduler you use, or loop over them serially.
+
+    python3 train_sae.py <task_id> <task_ct>
+"""
 
 import sys
 from argparse import ArgumentParser

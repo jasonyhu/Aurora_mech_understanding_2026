@@ -1,7 +1,14 @@
 """Download CAMS global atmospheric-composition forecasts for a range of init
-times (SLURM array over dates). Thin wrapper around mirora.setup.download_cams."""
+times. Thin wrapper around mirora.setup.download_cams.
 
-import os
+Shards the date range across `task_ct` parallel tasks; run task `task_idx` with:
+
+    python3 download_cams.py <task_idx> <task_ct>
+
+For a single-process download use `python3 download_cams.py 0 1`. To parallelise,
+launch tasks 0..N-1 concurrently under whatever scheduler you use. Each task is
+resumable and skips dates that are already present."""
+
 import sys
 import logging
 from datetime import timedelta
@@ -15,9 +22,6 @@ logger = logging.getLogger(__name__)
 
 assert len(sys.argv) == 3, "INTENDED USAGE: python3 download_cams.py <task_idx> <task_ct>"
 task_idx, task_ct = int(sys.argv[1]), int(sys.argv[2])
-
-if task_idx == 0 and not download_cams.verify_all_downloads(consts.OAK_CAMS_DATA, consts.data_start_time, consts.data_end_time):
-    os.system('sbatch mirora/scripts/slurm/download_cams.sh')
 
 cur_time = consts.data_start_time + timedelta(hours=12*task_idx)
 

@@ -1,5 +1,10 @@
 """Run the base Aurora Air Pollution rollout for each init batch and save
-predictions + pre/post-backbone embeddings (SLURM array over inits)."""
+predictions + pre/post-backbone embeddings.
+
+Shards the inits across `task_ct` parallel tasks; run task `task_id` with:
+
+    python3 run_base_rollout.py <task_id> <task_ct>
+"""
 
 import sys
 from torch.utils.data import DataLoader, Subset
