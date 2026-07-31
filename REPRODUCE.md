@@ -28,6 +28,14 @@ Set one environment variable:
 export MIRORA_SCRATCH=/path/to/mirora   # needs ~60 GB
 ```
 
+The Aurora checkpoint and the SAEs are fetched through HuggingFace, which caches
+to `~/.cache/huggingface` by default. If your home directory is small, point the
+cache at the same volume:
+
+```bash
+export HF_HOME=$MIRORA_SCRATCH/.cache
+```
+
 ## 3. Credentials for the public data
 
 **Copernicus ADS (CAMS forecasts).** Free account, then put your key in
