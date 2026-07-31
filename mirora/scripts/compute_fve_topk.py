@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 NUM_BATCHES = 20
 EXPANSION_FACTOR = 8
 
-
 def find_topk_sae(sae_dir: Path, component: str, stage_idx: int, block_idx: int) -> tuple[Path, int] | None:
     """Find a BatchTopK SAE checkpoint and extract k from the filename."""
     pattern = f"sae_topk_{component}_s{stage_idx}_b{block_idx}_x{EXPANSION_FACTOR}_k*.pt"

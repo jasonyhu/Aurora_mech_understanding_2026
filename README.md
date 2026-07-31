@@ -30,9 +30,9 @@ See **[REPRODUCE.md](REPRODUCE.md)**.
 cd mirora && pip install -e ".[all]" && cd ..
 export MIRORA_SCRATCH=/somewhere/with/space/mirora
 
-python3 mirora/scripts/python/prepare_figure_data.py --all   # fetch + process public data
-python3 mirora/scripts/python/reproduce_figures.py --check   # confirm inputs
-python3 mirora/scripts/python/reproduce_figures.py --all     # render every figure
+python3 mirora/scripts/prepare_figure_data.py --all   # fetch + process public data
+python3 mirora/scripts/reproduce_figures.py --check   # confirm inputs
+python3 mirora/scripts/reproduce_figures.py --all     # render every figure
 ```
 
 The library is also importable directly:
@@ -49,7 +49,7 @@ The 48 SAEs (8× expansion, one per hookable backbone block) are released on
 HuggingFace: [**hujason/aurorascope**](https://huggingface.co/hujason/aurorascope).
 
 ```bash
-python3 mirora/scripts/python/download_saes.py
+python3 mirora/scripts/download_saes.py
 ```
 
 ## Data sources

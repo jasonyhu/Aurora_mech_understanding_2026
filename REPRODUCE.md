@@ -5,10 +5,10 @@ All data in the project is public: CAMS global atmospheric-composition forecasts
 There are two starter scripts to reproduce the figures of the paper:
 ```bash
 # 1. fetch + process the public data the figures need
-python3 mirora/scripts/python/prepare_figure_data.py --all
+python3 mirora/scripts/prepare_figure_data.py --all
 
 # 2. render every figure
-python3 mirora/scripts/python/reproduce_figures.py --all
+python3 mirora/scripts/reproduce_figures.py --all
 ```
 
 ---
@@ -50,11 +50,11 @@ export HF_HOME=$MIRORA_SCRATCH/.cache
 
 ```bash
 # Aurora Air Pollution checkpoint (microsoft/aurora)
-python3 -c "import sys; sys.path.insert(0,'mirora/scripts/python'); import consts; \
+python3 -c "import sys; sys.path.insert(0,'mirora/scripts'); import consts; \
 from mirora.setup.download_model import download_model_checkpoint as d; d(consts.MODEL_PATH)"
 
 # download 48 trained sparse autoencoders (hujason/aurorascope)
-python3 mirora/scripts/python/download_saes.py
+python3 mirora/scripts/download_saes.py
 ```
 
 **FINN fire emissions**: create a free NCAR GDEX
@@ -64,14 +64,14 @@ account; the script prompts for an API token on first run and saves it to
 - Get a token: https://gdex.ucar.edu/accounts/profile/
 
 ```bash
-python3 mirora/scripts/python/download_finn.py
+python3 mirora/scripts/download_finn.py
 ```
 
 ## 4. Fetch and process the data
 
 ```bash
-python3 mirora/scripts/python/prepare_figure_data.py --list-inits   # what it will fetch
-python3 mirora/scripts/python/prepare_figure_data.py --all
+python3 mirora/scripts/prepare_figure_data.py --list-inits   # what it will fetch
+python3 mirora/scripts/prepare_figure_data.py --all
 ```
 
 The figures depend on only **7 initialisation times**, not the full validation year, so this downloads 14 CAMS forecasts (each init requires two timesteps).
@@ -79,8 +79,8 @@ The figures depend on only **7 initialisation times**, not the full validation y
 ## 5. Render the figures
 
 ```bash
-python3 mirora/scripts/python/reproduce_figures.py --check   # confirm inputs
-python3 mirora/scripts/python/reproduce_figures.py --all
+python3 mirora/scripts/reproduce_figures.py --check   # confirm inputs
+python3 mirora/scripts/reproduce_figures.py --all
 ```
 
 Figures are written under `$MIRORA_SCRATCH/figures/`.
@@ -98,7 +98,7 @@ reproduce_figures.py --dry-run --all
 
 | Tier | Figures | Requirement |
 |---|---|---|
-| **1** | Figs 1–4, all SI figures/tables/stats | CPU only, once step 4 has run |
+| **1** | Figs 1–4, all SI figures/stats | CPU only, once step 4 has run |
 | **2** | Figs 6–7 (SAE galleries) | A GPU — these run Aurora live to capture activations |
 | **3** | Fig 5 (PCA of backbone embeddings) | The full validation year, see below |
 

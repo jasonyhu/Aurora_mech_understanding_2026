@@ -4,19 +4,18 @@
 > need `prepare_figure_data.py` then `reproduce_figures.py`. This file documents
 > the individual scripts those two drive.
 
-Everything in `python/` is an entry point: a thin script that parses CLI args,
-imports the `mirora` package and `consts.py` (storage paths), and calls library
+Every script here is an entry point: a thin wrapper that parses CLI args, imports
+the `mirora` package and `consts.py` (storage paths), and calls library
 functions. Run them directly:
 
 ```bash
-python3 mirora/scripts/python/<name>.py
+python3 mirora/scripts/<name>.py
 ```
 
-Scripts marked
-**array** below shard their work across `task_ct` parallel tasks and take
-`<task_id> <task_ct>` as positional arguments; run them serially with `0 1`, or
-launch tasks `0..N-1` concurrently. Scripts marked **GPU** run Aurora live and
-need >= 32 GB of GPU memory.
+Scripts marked **array** below shard their work across `task_ct` parallel tasks
+and take `<task_id> <task_ct>` as positional arguments; run them serially with
+`0 1`, or launch tasks `0..N-1` concurrently. Scripts marked **GPU** run Aurora
+live and need >= 32 GB of GPU memory.
 
 ---
 

@@ -3,10 +3,10 @@
 
 Reviewers should normally only ever need this script:
 
-    python3 mirora/scripts/python/reproduce_figures.py --list     # what exists
-    python3 mirora/scripts/python/reproduce_figures.py --check    # are inputs present?
-    python3 mirora/scripts/python/reproduce_figures.py --all      # render everything runnable
-    python3 mirora/scripts/python/reproduce_figures.py --figure ozone_perturbation
+    python3 mirora/scripts/reproduce_figures.py --list     # what exists
+    python3 mirora/scripts/reproduce_figures.py --check    # are inputs present?
+    python3 mirora/scripts/reproduce_figures.py --all      # render everything runnable
+    python3 mirora/scripts/reproduce_figures.py --figure ozone_perturbation
 
 It does not reimplement any plotting: it is a manifest plus a runner that calls
 the existing per-figure scripts in this directory, in dependency order.

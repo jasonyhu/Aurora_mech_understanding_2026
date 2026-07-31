@@ -8,12 +8,12 @@ downloads only the handful of initialisation times the figures actually use
 `reproduce_figures.py` consumes.
 
     # 0. one-time: a Copernicus ADS API key in ~/.cdsapirc  (see REPRODUCE.md)
-    python3 mirora/scripts/python/prepare_figure_data.py --steps cams
-    python3 mirora/scripts/python/prepare_figure_data.py --steps batches
-    python3 mirora/scripts/python/prepare_figure_data.py --steps rollouts   # GPU
+    python3 mirora/scripts/prepare_figure_data.py --steps cams
+    python3 mirora/scripts/prepare_figure_data.py --steps batches
+    python3 mirora/scripts/prepare_figure_data.py --steps rollouts   # GPU
 
     # or everything in order:
-    python3 mirora/scripts/python/prepare_figure_data.py --all
+    python3 mirora/scripts/prepare_figure_data.py --all
 
 Every step is resumable: anything already on disk is skipped.
 
@@ -177,7 +177,7 @@ def main() -> int:
         if rc != 0:
             logger.error(f"step '{name}' reported problems; stopping.")
             return rc
-    logger.info("Done. Now run: python3 mirora/scripts/python/reproduce_figures.py --check")
+    logger.info("Done. Now run: python3 mirora/scripts/reproduce_figures.py --check")
     return 0
 
 
