@@ -23,7 +23,7 @@ def mmr_to_number_density(mmr, t, species, pressure=P_1000HPA):
 
 
 def nonpositive(no, no2, o3):
-    """Cells where any of NO, NO2, O3 is <= 0 (Aurora; CAMS has none)."""
+    """Cells where any of NO, NO2, O3 is <= 0"""
     return (no <= 0) | (no2 <= 0) | (o3 <= 0)
 
 

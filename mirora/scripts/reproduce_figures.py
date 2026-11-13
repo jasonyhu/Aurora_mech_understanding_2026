@@ -46,26 +46,14 @@ def _cams(init: str, kind: str) -> Path:
 # `pre` lists (script, args) steps run, in order, before `script` (e.g. the GPU
 # rollouts a plot reads).
 #
-# `paper` is the manuscript figure label. Confirm against the final manuscript
-# before release -- numbering may shift during revision.
+# `paper` lists the manuscript figures/tables each entry renders.
 # ---------------------------------------------------------------------------
 FIGURES = [
-    {
-        "id": "architecture",
-        "paper": "Fig 1",
-        "title": "Aurora Air Pollution architecture diagram",
-        "script": "plot_architecture_diagram.py",
-        "args": [],
-        "tier": 1,
-        "gpu": False,
-        "inputs": [],  # fully self-contained
-        "output": consts.FIGURES_PATH / "architecture",
-    },
     {
         "id": "chemistry_products",
         "paper": "Fig 2",
         "title": "Leighton ratio + NOx ratio, CAMS vs Aurora",
-        "script": "plot_chemistry_products.py",
+        "script": "fig2_plot_nox_partitioning_leighton_j1.py",
         "args": [],
         "tier": 1,
         "gpu": False,
@@ -74,9 +62,9 @@ FIGURES = [
     },
     {
         "id": "ozone_perturbation",
-        "paper": "Fig 3",
+        "paper": "Fig 3, Fig S3",
         "title": "NOx perturbation effect on ozone (composite + KDEs)",
-        "script": "plot_ozone_perturbation.py",
+        "script": "fig3_figS2_S3_plot_ozone_nox_response.py",
         "args": [],
         "tier": 1,
         "gpu": False,
@@ -90,9 +78,9 @@ FIGURES = [
     },
     {
         "id": "fire_stills",
-        "paper": "Fig 4",
+        "paper": "Fig 4, Figs S5-S6",
         "title": f"Wildfire case studies, CAMS vs Aurora ({len(FIRE_INITS)} events)",
-        "script": "plot_fire_stills.py",
+        "script": "fig4_figS5_S7_plot_wildfire_co_column.py",
         "args": [],
         "tier": 1,
         "gpu": False,
@@ -104,9 +92,9 @@ FIGURES = [
     },
     {
         "id": "pca_embeddings",
-        "paper": "Fig 5",
+        "paper": "Fig 5, Figs S8-S9, Table S2",
         "title": "PCA of backbone embeddings (single day / monthly / yearly)",
-        "script": "run_pca_analysis.py",
+        "script": "fig5_figS8_S9_tableS2_run_latent_pca.py",
         "args": [],
         "tier": 3,
         "gpu": False,
@@ -119,7 +107,7 @@ FIGURES = [
         "id": "sae_feature_grid",
         "paper": "Fig 6",
         "title": "SAE feature gallery (per-feature maps)",
-        "script": "plot_sae_feature_grid.py",
+        "script": "fig6_plot_sae_feature_maps.py",
         "args": [],
         "tier": 2,
         "gpu": True,
@@ -134,8 +122,8 @@ FIGURES = [
         "id": "sae_steering",
         "paper": "Fig 7",
         "title": "SAE feature steering (zero ablation), NO2/O3 difference maps",
-        "pre": [("run_sae_steering.py", [])],
-        "script": "plot_sae_steering_diffs.py",
+        "pre": [("fig7_run_sae_ablation_rollouts.py", [])],
+        "script": "fig7_plot_sae_ablation_diff_maps.py",
         "args": [],
         "tier": 2,
         "gpu": True,
@@ -149,9 +137,9 @@ FIGURES = [
     },
     {
         "id": "sae_examples",
-        "paper": "SI",
+        "paper": "Fig S12",
         "title": "SAE activation examples, 6x2 gallery",
-        "script": "plot_sae_examples.py",
+        "script": "figS12_plot_sae_feature_examples.py",
         "args": [],
         "tier": 2,
         "gpu": True,
@@ -165,9 +153,9 @@ FIGURES = [
     # ----- Supporting information -----
     {
         "id": "si_single_cell_nox",
-        "paper": "SI",
+        "paper": "Fig S4",
         "title": "Single-grid-cell NOx spike, spatial reach",
-        "script": "plot_single_cell_nox.py",
+        "script": "figS4_plot_single_column_nox_response.py",
         "args": [],
         "tier": 1,
         "gpu": False,
@@ -176,9 +164,9 @@ FIGURES = [
     },
     {
         "id": "si_validate_nox",
-        "paper": "SI stats",
+        "paper": "Sec 3.2 stats",
         "title": "Validate the reported NOx perturbation statistics",
-        "script": "validate_nox_claims.py",
+        "script": "fig3_check_nox_perturbation_statistics.py",
         "args": [],
         "tier": 1,
         "gpu": False,
@@ -199,10 +187,10 @@ def missing_inputs(fig: dict) -> list[Path]:
 
 
 def cmd_list() -> None:
-    print(f"{'ID':<22} {'PAPER':<10} {'TIER':<5} {'GPU':<4} TITLE")
-    print("-" * 100)
+    print(f"{'ID':<22} {'PAPER':<28} {'TIER':<5} {'GPU':<4} TITLE")
+    print("-" * 118)
     for f in FIGURES:
-        print(f"{f['id']:<22} {f['paper']:<10} {f['tier']:<5} "
+        print(f"{f['id']:<22} {f['paper']:<28} {f['tier']:<5} "
               f"{'yes' if f['gpu'] else '-':<4} {f['title']}")
     print("\nTier 1 = CPU, renders from the data prepare_figure_data.py produces")
     print("Tier 2 = needs a GPU (runs Aurora live)")

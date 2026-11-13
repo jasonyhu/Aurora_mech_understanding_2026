@@ -1,5 +1,5 @@
 """
-Loading trained L1 SAEs and reading or editing their features inside the backbone.
+Loading trained SAEs and reading or editing their features inside the backbone.
 """
 
 from pathlib import Path
@@ -12,14 +12,14 @@ from mirora.interp.aurora_sae import AuroraSAE
 
 def sae_path(sae_dir: Path, component: str, stage_idx: int, block_idx: int,
              expansion_factor: int = DEFAULT_EXPANSION_FACTOR) -> Path:
-    """Checkpoint path of an L1 SAE; the default 8x expansion has no `_x` suffix."""
+    """Checkpoint path of an SAE."""
     suffix = "" if expansion_factor == DEFAULT_EXPANSION_FACTOR else f"_x{expansion_factor}"
     return sae_dir / f"sae_{component}_s{stage_idx}_b{block_idx}{suffix}.pt"
 
 
 def load_sae(sae_dir: Path, component: str, stage_idx: int, block_idx: int, d_model: int,
              device: torch.device, expansion_factor: int = DEFAULT_EXPANSION_FACTOR) -> AuroraSAE:
-    """Load a trained L1 SAE in eval mode on `device`."""
+    """Load a trained SAE in eval mode on `device`."""
     sae = AuroraSAE(d_model=d_model, expansion_factor=expansion_factor)
     path = sae_path(sae_dir, component, stage_idx, block_idx, expansion_factor)
     sae.load_state_dict(torch.load(path, map_location=device, weights_only=True))
@@ -28,7 +28,7 @@ def load_sae(sae_dir: Path, component: str, stage_idx: int, block_idx: int, d_mo
 
 def var_contribution(sae: AuroraSAE, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Per-token feature activations h [N, d_hidden] and each feature's share of the
-    token's centred variance, h^2 / ||x - b_dec||^2 (W_dec rows are unit-norm)."""
+    token's centered variance, h^2 / ||x - b_dec||^2 (W_dec rows are unit-norm)."""
     h = sae.encode(x)
     token_var = ((x - sae.b_dec) ** 2).sum(dim=-1, keepdim=True)
     return h, h ** 2 / (token_var + 1e-12)

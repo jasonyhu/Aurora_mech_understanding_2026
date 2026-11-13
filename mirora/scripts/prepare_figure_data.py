@@ -40,16 +40,16 @@ HERE = Path(__file__).resolve().parent
 
 # The only initialisations any manuscript figure depends on.
 FIGURE_INITS: dict[datetime, str] = {
-    consts.MAIN_INIT_TIME: "main init - chemistry, ozone, SAE grid, steering, SI",
+    consts.MAIN_INIT_TIME: "main init - Figs 2, 3, 6, 7, S2-S4",
     **{datetime.strptime(e["init"], r"%Y%m%d_%H%M"): f"wildfire - {e['label']}" for e in consts.FIRE_EVENTS},
-    datetime(2022, 11, 1, 0): "SAE activation examples",
+    datetime(2022, 11, 1, 0): "SAE activation examples (Figure S12)",
 }
 
 # Rollout-producing scripts, run in this order. Each is already idempotent.
 ROLLOUT_SCRIPTS = [
-    ("run_nox_perturbations.py", "base + NOx +0.5/+5/+20 ppb (2022-09-01)"),
-    ("run_fire_base_rollouts.py", "base rollouts for the wildfire case studies"),
-    ("run_single_cell_nox.py", "single-grid-cell NOx spike (SI)"),
+    ("fig3_run_global_nox_perturbations.py", "base + NOx +0.5/+5/+20 ppb (2022-09-01)"),
+    ("fig4_run_wildfire_base_rollouts.py", "base rollouts for the wildfire case studies"),
+    ("figS4_run_single_column_nox_perturbation.py", "single-grid-cell NOx spike (Figure S4)"),
 ]
 
 

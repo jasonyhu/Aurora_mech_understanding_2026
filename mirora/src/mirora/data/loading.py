@@ -134,66 +134,45 @@ def load_finn_fires(
     if not finn_event_dir.exists():
         return None
 
-    # Try gridded NetCDF files
     nc_files = sorted(finn_event_dir.glob("*.nc")) + sorted(finn_event_dir.glob("*.nc4"))
     for nc_path in nc_files:
-        try:
-            ds = xr.open_dataset(nc_path)
-            time_dim = None
-            for dim in ["time", "date", "day"]:
-                if dim in ds.dims or dim in ds.coords:
-                    time_dim = dim
-                    break
+        ds = xr.open_dataset(nc_path)
+        time_dim = None
+        for dim in ["time", "date", "day"]:
+            if dim in ds.dims or dim in ds.coords:
+                time_dim = dim
+                break
 
-            if time_dim is not None:
-                times = pd.to_datetime(ds[time_dim].values)
-                target_date = valid_time.date()
-                time_mask = [t.date() == target_date for t in times]
-                if not any(time_mask):
-                    continue
-                idx = time_mask.index(True)
-                co_data = ds["fire_modisviirs_CO"].isel({time_dim: idx})
-            else:
-                doy = valid_time.timetuple().tm_yday
-                if (f"{valid_time.year}{doy:03d}" not in nc_path.name
-                        and valid_time.strftime("%Y%m%d") not in nc_path.name):
-                    continue
-                co_data = ds["fire_modisviirs_CO"]
-
-            co_vals = co_data.squeeze().values
-            lat_name = "latitude" if "latitude" in ds.coords else "lat"
-            lon_name = "longitude" if "longitude" in ds.coords else "lon"
-            lats = ds[lat_name].values
-            lons = ds[lon_name].values
-
-            fire_mask = co_vals > 0
-            if not fire_mask.any():
-                ds.close()
+        if time_dim is not None:
+            times = pd.to_datetime(ds[time_dim].values)
+            target_date = valid_time.date()
+            time_mask = [t.date() == target_date for t in times]
+            if not any(time_mask):
                 continue
+            idx = time_mask.index(True)
+            co_data = ds["fire_modisviirs_CO"].isel({time_dim: idx})
+        else:
+            doy = valid_time.timetuple().tm_yday
+            if (f"{valid_time.year}{doy:03d}" not in nc_path.name
+                    and valid_time.strftime("%Y%m%d") not in nc_path.name):
+                continue
+            co_data = ds["fire_modisviirs_CO"]
 
-            fire_lat_idx, fire_lon_idx = np.where(fire_mask)
-            fire_lats = lats[fire_lat_idx]
-            fire_lons = lons[fire_lon_idx]
-            # Convert 0-360 to -180-180 if needed
-            fire_lons = np.where(fire_lons > 180, fire_lons - 360, fire_lons)
+        co_vals = co_data.squeeze().values
+        lat_name = "latitude" if "latitude" in ds.coords else "lat"
+        lon_name = "longitude" if "longitude" in ds.coords else "lon"
+        lats = ds[lat_name].values
+        lons = ds[lon_name].values
+
+        fire_mask = co_vals > 0
+        if not fire_mask.any():
             ds.close()
-            return fire_lats, fire_lons
-        except Exception:
             continue
 
-    # Fallback: text files
-    import glob as glob_mod
-    doy = valid_time.timetuple().tm_yday
-    year = valid_time.year
-    pattern = str(finn_event_dir / f"*{year}{doy:03d}*.txt")
-    files = glob_mod.glob(pattern)
-    if files:
-        try:
-            df = pd.read_csv(files[0])
-            lat_col = [c for c in df.columns if "lat" in c.lower()][0]
-            lon_col = [c for c in df.columns if "lon" in c.lower()][0]
-            return df[lat_col].values, df[lon_col].values
-        except Exception as e:
-            logger.warning(f"Could not parse FINN file {files[0]}: {e}")
-
-    return None
+        fire_lat_idx, fire_lon_idx = np.where(fire_mask)
+        fire_lats = lats[fire_lat_idx]
+        fire_lons = lons[fire_lon_idx]
+        # Convert 0-360 to -180-180 if needed
+        fire_lons = np.where(fire_lons > 180, fire_lons - 360, fire_lons)
+        ds.close()
+        return fire_lats, fire_lons

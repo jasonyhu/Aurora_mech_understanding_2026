@@ -96,8 +96,7 @@ def init_aap_batch(init_time: datetime, cams_save_path: Path, static_vars_path: 
 
 def save_init_batch(init_time: datetime, save_dir: Path, cams_save_path: Path, static_vars_path: Path):
     """
-    Generate and store an AuroraAirPollution initialization Batch
-    at time `init_time`.
+    Generate and store an aap initialization batch at time `init_time`.
     """
     batch_path = get_init_batch_path(save_dir, init_time)
     if verify_init_batch(batch_path):

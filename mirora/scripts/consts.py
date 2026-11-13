@@ -11,7 +11,7 @@ data_end_time = datetime(2023, 5, 31, 12)
 val_start_time = datetime(2022, 6, 1, 0)
 val_end_time   = datetime(2023, 5, 31, 12)  # inclusive
 
-# Running example used by almost all paper figures
+# Running example used by paper figures
 MAIN_INIT_TIME = datetime(2022, 9, 1, 0)
 MAIN_INIT_STR  = MAIN_INIT_TIME.strftime(r"%Y%m%d_%H%M")
 
@@ -75,18 +75,7 @@ def val_init_times() -> list[datetime]:
     """Every 12-hourly init in the validation year that has a saved init batch."""
     return available_init_times(BATCH_INITS_PATH, val_start_time, val_end_time)
 
-# ==========================================
-# NOx perturbation unit convention
-# ==========================================
-# Select with MIRORA_NOX_CONVENTION; results for each convention live in
-# separate experiments/analysis/figures subtrees (base rollouts are shared).
-#   "mmr"  (original): +X adds X*1e-9 kg/kg (mass mixing ratio) to EACH of NO
-#          and NO2, i.e. ~1.6*X ppbv NOx in total (+5 -> 4.8 ppbv NO + 3.2 ppbv NO2).
-#   "ppbv": +X adds X ppbv of NOx in total, split 1:1 by moles (X/2 ppbv each).
 NOX_CONVENTION = os.environ.get("MIRORA_NOX_CONVENTION", "mmr")
-if NOX_CONVENTION not in ("mmr", "ppbv"):
-    raise ValueError(f"MIRORA_NOX_CONVENTION must be 'mmr' or 'ppbv', got {NOX_CONVENTION!r}")
-
 NOX_MAGNITUDES_PPB = [0.5, 5, 20]
 
 NOX_EXPERIMENTS_PATH = EXPERIMENTS_PATH / f"nox_{NOX_CONVENTION}"
@@ -95,7 +84,6 @@ NOX_FIGURES_PATH     = FIGURES_PATH / f"nox_{NOX_CONVENTION}"
 
 NOX_UNIT_LABEL = {
     "mmr": r"ppb (mass, each of NO and NO$_2$)",
-    "ppbv": r"ppbv NO$_x$",
 }[NOX_CONVENTION]
 
 def nox_experiment_dir(ppb: float) -> Path:
@@ -115,7 +103,7 @@ def nox_offsets(ppb: float) -> dict[str, float]:
 # SAE case-study features (steering figure)
 # ==========================================
 # The two features ablated in the steering figure: the largest O3 response and
-# a feature chosen for NO2 (from find_top_activating_features.py).
+# a feature chosen for NO2 (from tableS5_S6_rank_and_ablate_top_sae_features.py).
 CASE_STUDY_FEATURES = [
     {"name": "decoder_s1_b9_feat2712", "species": "ozone", "component": "decoder",
      "stage": 1, "block": 9, "dim": 1024, "feat_idx": 2712},
@@ -126,19 +114,11 @@ CASE_STUDY_FEATURES = [
 # ==========================================
 # Wildfire case studies
 # ==========================================
-# bbox = [south, north, west, east] (deg) of the regional view; FINN detections
-# are downloaded for the 6 days from the init over the same box.
 FIRE_EVENTS = [
+    {"name": "spain_jul2022", "label": "Spain", "init": "20220715_1200",
+     "bbox": [30, 50, -15, 10], "finn_country": "Spain"},
+    {"name": "alaska_jul2022", "label": "Alaska", "init": "20220703_0000",
+     "bbox": [40, 75, -170, -80], "finn_country": None},
     {"name": "central_russia_aug2022", "label": "Central Russia", "init": "20220819_1200",
      "bbox": [35, 75, 10, 80], "finn_country": "Russia"},
-    {"name": "siberia_yakutia_jul2022", "label": "Siberia (Yakutia)", "init": "20220710_1200",
-     "bbox": [40, 75, 90, 180], "finn_country": "Russia"},
-    {"name": "alaska_jul2022", "label": "Alaska/Yukon", "init": "20220703_0000",
-     "bbox": [40, 75, -170, -80], "finn_country": None},
-    {"name": "amazon_sep2022", "label": "Amazon Basin", "init": "20220906_0000",
-     "bbox": [-35, 10, -85, -35], "finn_country": None},
-    {"name": "south_america_jun2022", "label": "Chile/Argentina", "init": "20220615_1200",
-     "bbox": [-55, -10, -85, -40], "finn_country": None},
-    {"name": "spain_jul2022", "label": "Spain (Iberia)", "init": "20220715_1200",
-     "bbox": [30, 50, -15, 10], "finn_country": "Spain"},
 ]

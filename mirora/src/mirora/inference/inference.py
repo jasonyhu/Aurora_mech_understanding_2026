@@ -34,7 +34,6 @@ def aap_rollout(
     """Roll out Aurora and pickle the predictions (and optionally backbone embeddings).
 
     `embedding_steps` keeps only the first k rollout steps' embeddings (None = all).
-    Step 0 alone is what the PCA analysis reads, at ~1/10 of the disk.
     Pass an already-loaded `model` to skip reloading the checkpoint.
     """
     if model is None:

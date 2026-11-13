@@ -122,11 +122,3 @@ SEASON_OF_MONTH = {12: "DJF", 1: "DJF", 2: "DJF", 3: "MAM", 4: "MAM", 5: "MAM",
 DEFAULT_EXPANSION_FACTOR = 8
 DEFAULT_L1_COEFF = 3e-4
 DEFAULT_SAE_LR = 4e-4
-
-# ==========================================
-# BatchTopK SAE Defaults
-# ==========================================
-
-DEFAULT_TOPK_K_DIVISOR = 32  # k = d_hidden // this value (~3% active)
-DEFAULT_TOPK_ALPHA_AUX = 1 / 32
-DEFAULT_TOPK_DEAD_STEPS = 5000

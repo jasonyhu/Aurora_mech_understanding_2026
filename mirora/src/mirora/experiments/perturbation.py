@@ -8,7 +8,6 @@ from aurora import Batch
 
 G = 9.80665  # standard gravity (m/s²)
 
-
 def perturb_batch(
     batch: Batch,
     atmos_vars: dict[str, float],
