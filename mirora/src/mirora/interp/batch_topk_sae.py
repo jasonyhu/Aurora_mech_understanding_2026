@@ -8,9 +8,24 @@ sparsity while maintaining a fixed average sparsity level.
 Reference: Bussmann et al., "BatchTopK Sparse Autoencoders" (2024)
 """
 
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from mirora.config import DEFAULT_TOPK_ALPHA_AUX, DEFAULT_TOPK_DEAD_STEPS, DEFAULT_TOPK_K_DIVISOR
+
+
+def find_topk_checkpoint(
+    sae_dir: Path, component: str, stage_idx: int, block_idx: int, expansion_factor: int = 8,
+) -> tuple[Path, int] | None:
+    """Find a trained BatchTopK SAE checkpoint (not an epoch snapshot); returns (path, k) or None."""
+    pattern = f"sae_topk_{component}_s{stage_idx}_b{block_idx}_x{expansion_factor}_k*.pt"
+    matches = sorted(p for p in sae_dir.glob(pattern) if "epoch" not in p.name)
+    if not matches:
+        return None
+    return matches[0], int(matches[0].stem.split("_k")[-1])
 
 
 class BatchTopKSAE(nn.Module):
@@ -20,15 +35,15 @@ class BatchTopKSAE(nn.Module):
         expansion_factor: int = 8,
         k: int | None = None,
         k_aux: int | None = None,
-        alpha_aux: float = 1 / 32,
-        dead_steps_threshold: int = 5000,
+        alpha_aux: float = DEFAULT_TOPK_ALPHA_AUX,
+        dead_steps_threshold: int = DEFAULT_TOPK_DEAD_STEPS,
         ema_decay: float = 0.999,
     ):
         """
         Args:
             d_model: Input dimension.
             expansion_factor: Hidden dimension = d_model * expansion_factor.
-            k: Number of active features per token. Defaults to d_hidden // 32.
+            k: Number of active features per token. Defaults to d_hidden // DEFAULT_TOPK_K_DIVISOR.
             k_aux: Number of dead features used in auxiliary loss. Defaults to k.
             alpha_aux: Weight for auxiliary dead feature loss.
             dead_steps_threshold: Steps without firing before a feature is considered dead.
@@ -38,10 +53,11 @@ class BatchTopKSAE(nn.Module):
         self.d_model = d_model
         self.d_hidden = d_model * expansion_factor
         self.expansion_factor = expansion_factor
-        self.k = k if k is not None else self.d_hidden // 32
+        self.k = k if k is not None else self.d_hidden // DEFAULT_TOPK_K_DIVISOR
         self.k_aux = k_aux if k_aux is not None else self.k
         self.alpha_aux = alpha_aux
         self.dead_steps_threshold = dead_steps_threshold
+        self.ema_decay = ema_decay
 
         # Encoder/Decoder weights (same parameterization as AuroraSAE)
         self.W_enc = nn.Parameter(nn.init.kaiming_uniform_(torch.empty(d_model, self.d_hidden)))
@@ -114,7 +130,7 @@ class BatchTopKSAE(nn.Module):
                 # k-th largest value per token, averaged
                 kth_vals, _ = torch.topk(pre_acts, self.k, dim=-1)
                 kth_val = kth_vals[:, -1].mean()
-                self.ema_threshold.lerp_(kth_val, 1.0 - 0.999)
+                self.ema_threshold.lerp_(kth_val, 1.0 - self.ema_decay)
 
             # Update dead feature tracking
             with torch.no_grad():

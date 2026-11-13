@@ -29,17 +29,3 @@ class CAMSDataloader:
         atmos_vars = xr.open_dataset(atmos_vars_path, engine="netcdf4", decode_timedelta=True)
         data = atmos_vars.isel(forecast_period=forecast_period)[key][0, level].to_numpy()
         return data
-
-    def load_surf_var(
-        self, dt: datetime, key: str, 
-        forecast_period: int=0
-    ) -> np.ndarray:
-        """
-        Loads a 2d grid of the surface variable `key` at time `dt`, 
-        with a forecast offset of `forecast_period`. Valid keys are defined in aurora_consts,
-        and valid forecast periods depend on the number of rollout steps executed.
-        """
-        surf_var_path = get_cams_forecast_path(self.dir_path, dt) / "data_sfc.nc"
-        surf_vars = xr.open_dataset(surf_var_path, engine="netcdf4", decode_timedelta=True)
-        data = surf_vars.isel(forecast_period=forecast_period)[key][0].to_numpy()
-        return data

@@ -7,22 +7,22 @@ expect (sae_{component}_s{stage}_b{block}.pt).
 
 import logging
 import shutil
-import sys
 from pathlib import Path
 
 from huggingface_hub import snapshot_download
 
+from mirora.utils import setup_logging
+
 import consts
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout,
-                    format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 REPO = "hujason/aurorascope"
-SAE_DIR = consts.MODEL_PATH / "sae"
+SAE_DIR = consts.SAE_DIR
 
 
 def main():
+    setup_logging()
     SAE_DIR.mkdir(parents=True, exist_ok=True)
     cache = consts.MODEL_PATH / "sae_hf_download"
     logger.info(f"snapshot_download {REPO} -> {cache}")

@@ -50,8 +50,7 @@ export HF_HOME=$MIRORA_SCRATCH/.cache
 
 ```bash
 # Aurora Air Pollution checkpoint (microsoft/aurora)
-python3 -c "import sys; sys.path.insert(0,'mirora/scripts'); import consts; \
-from mirora.setup.download_model import download_model_checkpoint as d; d(consts.MODEL_PATH)"
+python3 -c "import sys; sys.path.insert(0,'mirora/scripts'); import consts; consts.ensure_checkpoint()"
 
 # download 48 trained sparse autoencoders (hujason/aurorascope)
 python3 mirora/scripts/download_saes.py
@@ -74,7 +73,7 @@ python3 mirora/scripts/prepare_figure_data.py --list-inits   # what it will fetc
 python3 mirora/scripts/prepare_figure_data.py --all
 ```
 
-The figures depend on only **7 initialisation times**, not the full validation year, so this downloads 14 CAMS forecasts (each init requires two timesteps).
+The figures depend on only **8 initialisation times**, not the full validation year, so this downloads 16 CAMS forecasts (each init requires two timesteps).
 
 ## 5. Render the figures
 
@@ -83,7 +82,8 @@ python3 mirora/scripts/reproduce_figures.py --check   # confirm inputs
 python3 mirora/scripts/reproduce_figures.py --all
 ```
 
-Figures are written under `$MIRORA_SCRATCH/figures/`.
+Figures are written under `$MIRORA_SCRATCH/figures/`; the NOx-perturbation figures go to
+`figures/nox_mmr/` (see *NOx unit convention* below).
 
 ```bash
 reproduce_figures.py --list                        # every figure, tier, GPU need
@@ -99,17 +99,25 @@ reproduce_figures.py --dry-run --all
 | Tier | Figures | Requirement |
 |---|---|---|
 | **1** | Figs 1–4, all SI figures/stats | CPU only, once step 4 has run |
-| **2** | Figs 6–7 (SAE galleries) | A GPU — these run Aurora live to capture activations |
+| **2** | Fig 6 (SAE feature grid), Fig 7 (SAE steering), SI SAE examples | A GPU — these run Aurora live |
 | **3** | Fig 5 (PCA of backbone embeddings) | The full validation year, see below |
 
 Use GPUs with **>= 32 GB** RAM, and set
 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`.
 
 **Figure 5** The PCA panels are computed over backbone embeddings
-for every rollout in the validation year, which is ~10.4 GB per initialisation across
-730 initialisations (~7.6 TB). `prepare_figure_data.py` ignores this figure. To reproduce that panel, run the full pipeline
+for every rollout in the validation year, which is ~3.5 GB per initialisation
+(predictions plus first-step embeddings) across 730 initialisations (~2.5 TB). `prepare_figure_data.py` ignores this figure. To reproduce that panel, run the full pipeline
 (`mirora/scripts/README.md`): download the full CAMS year, build all init
 batches, then run `run_base_rollout.py` with backbone activations enabled.
+
+## NOx unit convention
+
+The NOx perturbations add a fixed mass mixing ratio, X·10⁻⁹ kg/kg, to **each** of
+NO and NO₂ (`MIRORA_NOX_CONVENTION=mmr`, the default and what the paper uses), so
+"+5 ppb" corresponds to ≈8 ppbv of total NOx. Setting `MIRORA_NOX_CONVENTION=ppbv`
+instead adds X ppbv of total NOx split 1:1 by moles. Each convention writes to its
+own `experiments/`, `analysis/` and `figures/` subfolder (`nox_mmr/`, `nox_ppbv/`).
 
 ---
 
@@ -121,8 +129,8 @@ behind Fig 5 — follow the numbered runbook in
 
 1. `download_cams.py` — the full CAMS validation year
 2. `save_init_batches.py` — Aurora `Batch` objects
-3. `run_base_rollout.py` — rollouts + backbone embeddings (the multi-TB step)
-4. `train_sae.py` — train the 48 sparse autoencoders (~3 h each on one GPU)
+3. `run_base_rollout.py` — rollouts + first-step backbone embeddings (the ~2.5 TB step)
+4. `train_sae.py` — train the 48 sparse autoencoders (~3 h each on one GPU; `--method topk` for BatchTopK)
 5. `reproduce_figures.py --all`
 
 Steps 1–4 shard their work across parallel tasks and take `<task_id> <task_ct>`

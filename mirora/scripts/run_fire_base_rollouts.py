@@ -1,48 +1,45 @@
 """
-Regenerate base rollouts for the four additional wildfire case-study inits
-(Siberia, Alaska, Amazon, Argentina) so plot_fire_stills.py can render the
-SI figures. Predictions only (no backbone activations). ~a few min each.
+Regenerate any missing base rollouts for the wildfire case-study inits
+(consts.FIRE_EVENTS) so plot_fire_stills.py can render the SI figures.
+Predictions only (no backbone activations). ~a few min each.
 """
 
-import pickle
 import logging
-import sys
 from datetime import datetime
 
-from mirora.inference.inference import aap_rollout
-from mirora.utils import get_init_batch_path
+from mirora.data.loading import load_batch
+from mirora.inference.inference import aap_rollout, load_aurora
+from mirora.utils import setup_logging
+
 import consts
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout,
-                    format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 ROLLOUT_STEPS = 10
-INITS = [
-    datetime(2022, 7, 10, 12),  # Siberia (Yakutia)
-    datetime(2022, 7, 3, 0),    # Alaska/Yukon
-    datetime(2022, 9, 6, 0),    # Amazon Basin
-    datetime(2022, 6, 15, 12),  # Chile/Argentina
-]
 
 
 def main():
-    base_dir = consts.EXPERIMENTS_PATH / "base"
-    for init_time in INITS:
-        out = base_dir / init_time.strftime(r"%Y%m%d_%H%M") / "predictions.pickle"
+    setup_logging()
+    todo = []
+    for event in consts.FIRE_EVENTS:
+        out = consts.base_rollout_path(event["init"])
         if out.exists():
             logger.info(f"{out} exists, skipping.")
-            continue
+        else:
+            todo.append(datetime.strptime(event["init"], r"%Y%m%d_%H%M"))
+    if todo:
+        consts.ensure_checkpoint()
+        model, _ = load_aurora(consts.CHECKPOINT_PATH)
+    for init_time in todo:
         logger.info(f"=== Base rollout {init_time} ===")
-        with open(get_init_batch_path(consts.BATCH_INITS_PATH, init_time), "rb") as f:
-            batch = pickle.load(f)
         aap_rollout(
-            batch=batch,
+            batch=load_batch(consts.BATCH_INITS_PATH, init_time),
             batch_date=init_time,
             aap_checkpoint_path=consts.CHECKPOINT_PATH,
-            save_dir=base_dir,
+            save_dir=consts.EXPERIMENTS_PATH / "base",
             rollout_steps=ROLLOUT_STEPS,
             save_backbone_activations=False,
+            model=model,
         )
     logger.info("Done.")
 

@@ -7,19 +7,14 @@ import cartopy.crs as ccrs
 
 logger = logging.getLogger(__name__)
 
-plt.rcParams['mathtext.fontset'] = 'stix'
-plt.rcParams['font.family'] = 'STIXGeneral'
-plt.rcParams['font.size'] = 12
-
 def plot_rgb_grid(rgb: np.ndarray, title: str, save_path: Path):
     """
-    Plots the RGB latent map `rgb` and saves it to `save_dir`.
-    Intended for use with interp.embedding_pca.py.
+    Plots the [H, W, 3] RGB latent map `rgb` (0..360 longitudes) and saves it to `save_path`.
 
     If `title` is empty or None, no title is drawn.
     """
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    fig = plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(10, 5))
     ax = plt.axes(projection=ccrs.PlateCarree(central_longitude=0))
 
     rgb = np.roll(rgb, 150, axis=1)

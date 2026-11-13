@@ -1,103 +1,83 @@
 """
-Compute fraction of variance explained (FVE) for all trained SAEs.
-Hooks all 48 layers simultaneously, runs N batches, and reports FVE = 1 - MSE/Var(x).
+Fraction of variance explained (FVE = 1 - MSE/Var(x)) and L0 of all trained SAEs.
+Hooks all 48 blocks at once, runs the first NUM_BATCHES validation inits, and
+writes FIGURES_PATH/fve_{method}_results.csv.
+
+USAGE: python3 compute_fve.py [--method {l1,topk}]
 """
 
+import argparse
 import csv
-import sys
 import logging
+import sys
 
 import torch
-from torch.utils.data import DataLoader
 
-from mirora.data.aurora_batches import AuroraInitBatchesDataset
-from mirora.interp.aurora_sae import AuroraSAE
-from mirora.config import STAGES
-from mirora.interp.train_sae import aurora_collate_fn
-from aurora import AuroraAirPollution
+from mirora.config import DEFAULT_EXPANSION_FACTOR, STAGES
+from mirora.data.loading import load_batch
+from mirora.inference.inference import load_aurora
+from mirora.interp import BatchTopKSAE, capture_blocks, find_topk_checkpoint, load_sae, sae_path
+from mirora.utils import setup_logging
 
 import consts
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
 NUM_BATCHES = 20
 
-def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    sae_dir = consts.MODEL_PATH / "sae"
 
-    # Load Aurora
-    logger.info("Loading Aurora model...")
-    model = AuroraAirPollution()
-    model.load_checkpoint_local(str(consts.CHECKPOINT_PATH))
-    model = model.to(device).eval()
-
-    # Load all SAEs
-    logger.info("Loading all SAEs...")
+def load_saes(method, device):
+    """{STAGES index: (sae, k)} for every block with a trained SAE (k is None for L1)."""
     saes = {}
-    for idx, (target_decoder, stage_idx, block_idx, dim) in enumerate(STAGES):
-        component = "decoder" if target_decoder else "encoder"
-        path = sae_dir / f"sae_{component}_s{stage_idx}_b{block_idx}.pt"
-        if not path.exists():
-            logger.warning(f"SAE not found: {path}")
-            continue
-        sae = AuroraSAE(d_model=dim, expansion_factor=8)
-        sae.load_state_dict(torch.load(path, map_location=device, weights_only=True))
-        sae = sae.to(device).eval()
-        saes[idx] = sae
-
-    # Accumulators: running sum, sum of squares, MSE, and count per layer
-    stats = {idx: {"sum_var": 0.0, "mse_sum": 0.0, "l0_sum": 0.0, "n": 0} for idx in saes}
-
-    # Register hooks on all layers
-    handles = []
-    captured = {}
-
-    def make_hook(idx):
-        def hook_fn(_module, _input, output):
-            x = output[0]
-            captured[idx] = x.reshape(-1, x.shape[-1]).detach()
-        return hook_fn
-
-    for idx, (target_decoder, stage_idx, block_idx, _dim) in enumerate(STAGES):
-        if idx not in saes:
-            continue
-        if target_decoder:
-            target_layer = model.backbone.decoder_layers[stage_idx].blocks[block_idx]  # type: ignore[index]
+    for idx, (component, stage_idx, block_idx, dim) in enumerate(STAGES):
+        if method == "topk":
+            found = find_topk_checkpoint(consts.MODEL_PATH / "sae_topk", component, stage_idx, block_idx)
+            if found is None:
+                continue
+            path, k = found
+            sae = BatchTopKSAE(d_model=dim, expansion_factor=DEFAULT_EXPANSION_FACTOR, k=k)
+            sae.load_state_dict(torch.load(path, map_location=device, weights_only=True))
+            saes[idx] = (sae.to(device).eval(), k)
         else:
-            target_layer = model.backbone.encoder_layers[stage_idx].blocks[block_idx]  # type: ignore[index]
-        handles.append(target_layer.register_forward_hook(make_hook(idx)))
+            path = sae_path(consts.SAE_DIR, component, stage_idx, block_idx)
+            if not path.exists():
+                logger.warning(f"SAE not found: {path}")
+                continue
+            saes[idx] = (load_sae(consts.SAE_DIR, component, stage_idx, block_idx, dim, device), None)
+    return saes
 
-    # DataLoader
-    dataset = AuroraInitBatchesDataset(
-        save_dir=consts.BATCH_INITS_PATH,
-        start=consts.val_start_time,
-        end=consts.val_end_time,
-    )
-    dataloader = DataLoader(
-        dataset, batch_size=1, shuffle=False,
-        collate_fn=aurora_collate_fn, num_workers=4,
-    )
 
-    # Run inference
+def main():
+    setup_logging()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--method", choices=["l1", "topk"], default="l1")
+    args = parser.parse_args()
+
+    logger.info("Loading Aurora model...")
+    model, device = load_aurora(consts.CHECKPOINT_PATH)
+
+    logger.info(f"Loading {args.method} SAEs...")
+    saes = load_saes(args.method, device)
+    if not saes:
+        logger.error(f"No {args.method} SAEs found. Run training first.")
+        sys.exit(1)
+
+    stats = {idx: {"sum_var": 0.0, "mse_sum": 0.0, "l0_sum": 0.0, "n": 0} for idx in saes}
+    keys = {idx: STAGES[idx][:3] for idx in saes}
+
     logger.info(f"Running {NUM_BATCHES} batches...")
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(dataloader):
-            if batch_idx >= NUM_BATCHES:
-                break
+    with capture_blocks(model, list(keys.values())) as captured, torch.no_grad():
+        for batch_idx, init_time in enumerate(consts.val_init_times()[:NUM_BATCHES]):
+            model(load_batch(consts.BATCH_INITS_PATH, init_time).to(device))
 
-            captured.clear()
-            batch = batch.to(device)
-            _ = model(batch)
+            for idx, (sae, _) in saes.items():
+                x = captured[keys[idx]]
+                x = x.reshape(-1, x.shape[-1])
+                if args.method == "topk":
+                    x_hat, h, _ = sae(x, training=False)
+                else:
+                    x_hat, h = sae(x)
 
-            for idx, sae in saes.items():
-                if idx not in captured:
-                    continue
-                x = captured[idx]
-                x_hat, h = sae(x)
-
-                # Variance of x (across all tokens and dimensions)
                 stats[idx]["sum_var"] += x.var().item()
                 stats[idx]["mse_sum"] += torch.nn.functional.mse_loss(x_hat, x).item()
                 stats[idx]["l0_sum"] += (h > 0).float().sum(dim=-1).mean().item()
@@ -106,46 +86,41 @@ def main():
             if batch_idx % 5 == 0:
                 logger.info(f"Batch {batch_idx}/{NUM_BATCHES}")
 
-    # Remove hooks
-    for h in handles:
-        h.remove()
+    width = 100 if args.method == "topk" else 95
+    k_col = f" {'k':>6}" if args.method == "topk" else ""
+    print("\n" + "=" * width)
+    print(f"{'Layer':<32}{k_col} {'Var(x)':>10} {'MSE':>10} {'FVE':>10} {'FVE %':>10} {'L0':>8}")
+    print("=" * width)
 
-    # Report results
-    print("\n" + "=" * 95)
-    print(f"{'Layer':<30} {'Var(x)':>10} {'MSE':>10} {'FVE':>10} {'FVE %':>10} {'L0':>8}")
-    print("=" * 95)
-
-    csv_path = consts.FIGURES_PATH / "fve_l1_results.csv"
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
     rows = []
-
-    for idx, (target_decoder, stage_idx, block_idx, dim) in enumerate(STAGES):
+    for idx, (component, stage_idx, block_idx, dim) in enumerate(STAGES):
         if idx not in saes or stats[idx]["n"] == 0:
             continue
-        component = "decoder" if target_decoder else "encoder"
+        k = saes[idx][1]
         n = stats[idx]["n"]
         avg_var = stats[idx]["sum_var"] / n
         avg_mse = stats[idx]["mse_sum"] / n
         fve = 1.0 - avg_mse / avg_var if avg_var > 0 else float("nan")
         avg_l0 = stats[idx]["l0_sum"] / n
 
-        print(f"{component} s{stage_idx} b{block_idx} (dim={dim})".ljust(30)
-              + f"{avg_var:>10.4f} {avg_mse:>10.6f} {fve:>10.6f} {fve*100:>9.2f}% {avg_l0:>8.1f}")
+        k_val = f" {k:>6}" if k is not None else ""
+        print(f"{component} s{stage_idx} b{block_idx} (dim={dim})".ljust(32)
+              + f"{k_val} {avg_var:>10.4f} {avg_mse:>10.6f} {fve:>10.6f} {fve*100:>9.2f}% {avg_l0:>8.1f}")
 
-        rows.append({
-            "component": component, "stage": stage_idx, "block": block_idx,
-            "dim": dim, "method": "l1", "var": avg_var, "mse": avg_mse,
-            "fve": fve, "l0": avg_l0,
-        })
+        row = {"component": component, "stage": stage_idx, "block": block_idx, "dim": dim}
+        if k is not None:
+            row["k"] = k
+        rows.append({**row, "method": args.method, "var": avg_var, "mse": avg_mse, "fve": fve, "l0": avg_l0})
 
-    print("=" * 95)
+    print("=" * width)
 
-    if rows:
-        with open(csv_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
-            writer.writeheader()
-            writer.writerows(rows)
-        logger.info(f"CSV saved to {csv_path}")
+    csv_path = consts.FIGURES_PATH / f"fve_{args.method}_results.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+    logger.info(f"CSV saved to {csv_path}")
 
 
 if __name__ == "__main__":

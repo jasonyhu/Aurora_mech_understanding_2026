@@ -10,8 +10,10 @@ authors:
     given-names: "Patrick Obin"
   - family-names: "Kelp"
     given-names: "Makoto M."
+version: "0.2.0"
 year: 2026
 license: MIT
+repository-code: "https://github.com/jasonyhu/Aurora_mech_understanding_2026"
 preferred-citation:
   type: article
   title: "Toward Mechanistic Interpretability of an AI Foundation Model Fine-Tuned for Atmospheric Chemistry"

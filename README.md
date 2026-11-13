@@ -15,7 +15,7 @@ atmospheric chemistry (Aurora Air Pollution), and probe its learned chemistry wi
 
 - **NOx → ozone titration.** Uniform NOx perturbations (+0.5/+5/+20 ppb) reproduce
   the expected short-term ozone suppression under NOx-saturated conditions.
-- **Wildfire case studies.** Five 2022 fire events compared against CAMS, with
+- **Wildfire case studies.** Six 2022 fire events compared against CAMS, with
   FINN fire detections overlaid.
 - **Sparse autoencoders.** 48 SAEs (one per Swin3D backbone block) trained on
   backbone activations, with feature galleries and steering experiments.
@@ -38,8 +38,9 @@ python3 mirora/scripts/reproduce_figures.py --all     # render every figure
 The library is also importable directly:
 
 ```python
-from mirora.interp import AuroraSAE, BatchTopKSAE
-from mirora.data import AuroraInitBatchesDataset
+from mirora.inference.inference import load_aurora, aap_rollout
+from mirora.interp import AuroraSAE, load_sae, capture_blocks, feature_replacement_hook
+from mirora.data import load_batch, fetch_rollout, surface
 from mirora.experiments import perturb_batch
 ```
 

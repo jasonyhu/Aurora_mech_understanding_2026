@@ -12,42 +12,32 @@ Claims under test:
 Reports several candidate definitions so text numbers can be matched exactly.
 """
 
-import pickle
-from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 
+from mirora.config import MMR_TO_PPB
+from mirora.data.loading import fetch_rollout, surface
+
 import consts
 
-INIT_STR = datetime(2022, 9, 1, 0).strftime(r"%Y%m%d_%H%M")
-LEVEL = 0  # 1000 hPa
 
-M_AIR, M_O3, M_NO, M_NO2 = 28.97, 48.0, 30.006, 46.0055
-O3_PPB = (M_AIR / M_O3) * 1e9
-NO_PPB = (M_AIR / M_NO) * 1e9
-NO2_PPB = (M_AIR / M_NO2) * 1e9
-
-
-def load(exp):
-    if exp == "base":
-        p = consts.EXPERIMENTS_PATH / "base" / INIT_STR / "predictions.pickle"
-    else:
-        p = consts.EXPERIMENTS_PATH / exp / INIT_STR / "predictions.pickle"
-    with open(p, "rb") as f:
-        return pickle.load(f)
+def load(ppb=None):
+    """Sep 1 2022 00Z rollout: base if `ppb` is None, else the +`ppb` NOx experiment."""
+    init = consts.MAIN_INIT_STR
+    return fetch_rollout(consts.base_rollout_path(init) if ppb is None
+                         else consts.rollout_path(consts.nox_experiment_dir(ppb), init))
 
 
 def surf(preds, var, step):
-    return preds[step].atmos_vars[var][0, 0, LEVEL].numpy().astype(np.float64)
+    return surface(preds[step], var).astype(np.float64)
 
 
 def o3_ppb(preds, step):
-    return surf(preds, "go3", step) * O3_PPB
+    return surf(preds, "go3", step) * MMR_TO_PPB["go3"]
 
 
 def nox_ppb(preds, step):
-    return surf(preds, "no", step) * NO_PPB + surf(preds, "no2", step) * NO2_PPB
+    return surf(preds, "no", step) * MMR_TO_PPB["no"] + surf(preds, "no2", step) * MMR_TO_PPB["no2"]
 
 
 def report(base, pert, tag):
@@ -82,10 +72,11 @@ def report(base, pert, tag):
 
 
 def main():
-    base = load("base")
-    for exp in ["NOx_5ppb_increase", "NOx_20ppb_increase", "NOx_0.5ppb_increase"]:
+    base = load()
+    for ppb in [5, 20, 0.5]:
+        exp = f"NOx_{ppb:g}ppb_increase"
         try:
-            report(base, load(exp), exp)
+            report(base, load(ppb), exp)
         except FileNotFoundError as e:
             print(f"\n[skip] {exp}: {e}")
 

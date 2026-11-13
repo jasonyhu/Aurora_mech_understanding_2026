@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One entry point to regenerate every manuscript figure.
 
-Reviewers should normally only ever need this script:
+Normally this is the only script you need:
 
     python3 mirora/scripts/reproduce_figures.py --list     # what exists
     python3 mirora/scripts/reproduce_figures.py --check    # are inputs present?
@@ -23,25 +23,12 @@ import consts
 
 HERE = Path(__file__).resolve().parent
 
-# Rollout initialisation used by almost every manuscript figure.
-MAIN_INIT = "20220901_0000"
-
-# Wildfire case studies: (event name, rollout init) used by the wildfire figure.
-FIRE_EVENTS = [
-    ("central_russia_aug2022", "20220819_1200"),
-    ("siberia_yakutia_jul2022", "20220710_1200"),
-    ("alaska_jul2022", "20220703_0000"),
-    ("amazon_sep2022", "20220906_0000"),
-    ("south_america_jun2022", "20220615_1200"),
-]
-
-
-def _base(init: str) -> Path:
-    return consts.EXPERIMENTS_PATH / "base" / init / "predictions.pickle"
+MAIN_INIT = consts.MAIN_INIT_STR
+FIRE_INITS = [e["init"] for e in consts.FIRE_EVENTS]
 
 
 def _exp(name: str, init: str = MAIN_INIT) -> Path:
-    return consts.EXPERIMENTS_PATH / name / init / "predictions.pickle"
+    return consts.rollout_path(consts.NOX_EXPERIMENTS_PATH / name, init)
 
 
 def _cams(init: str, kind: str) -> Path:
@@ -51,10 +38,13 @@ def _cams(init: str, kind: str) -> Path:
 # ---------------------------------------------------------------------------
 # Figure manifest
 #
-# tier 1 = renders from the published figure-inputs bundle, CPU only
+# tier 1 = CPU only, renders from the data prepare_figure_data.py produces
 # tier 2 = needs a GPU (runs the Aurora model live)
 # tier 3 = needs the full pipeline output (terabytes of backbone embeddings);
 #          not reproducible from any practical download
+#
+# `pre` lists (script, args) steps run, in order, before `script` (e.g. the GPU
+# rollouts a plot reads).
 #
 # `paper` is the manuscript figure label. Confirm against the final manuscript
 # before release -- numbering may shift during revision.
@@ -79,7 +69,7 @@ FIGURES = [
         "args": [],
         "tier": 1,
         "gpu": False,
-        "inputs": [_base(MAIN_INIT), _cams(MAIN_INIT, "plev")],
+        "inputs": [consts.base_rollout_path(MAIN_INIT), _cams(MAIN_INIT, "plev")],
         "output": consts.FIGURES_PATH / "chemistry_products",
     },
     {
@@ -91,24 +81,24 @@ FIGURES = [
         "tier": 1,
         "gpu": False,
         "inputs": [
-            _base(MAIN_INIT),
+            consts.base_rollout_path(MAIN_INIT),
             _exp("NOx_0.5ppb_increase"),
             _exp("NOx_5ppb_increase"),
             _exp("NOx_20ppb_increase"),
         ],
-        "output": consts.FIGURES_PATH / "ozone_perturbation",
+        "output": consts.NOX_FIGURES_PATH / "ozone_perturbation",
     },
     {
         "id": "fire_stills",
         "paper": "Fig 4",
-        "title": "Wildfire case studies, CAMS vs Aurora (5 events)",
+        "title": f"Wildfire case studies, CAMS vs Aurora ({len(FIRE_INITS)} events)",
         "script": "plot_fire_stills.py",
         "args": [],
         "tier": 1,
         "gpu": False,
         "inputs": (
-            [_base(init) for _, init in FIRE_EVENTS]
-            + [_cams(init, "sfc") for _, init in FIRE_EVENTS]
+            [consts.base_rollout_path(init) for init in FIRE_INITS]
+            + [_cams(init, "sfc") for init in FIRE_INITS]
         ),
         "output": consts.FIGURES_PATH / "fire_stills",
     },
@@ -122,7 +112,7 @@ FIGURES = [
         "gpu": False,
         # Reads pre/post backbone embeddings for EVERY rollout in the range:
         # ~12.8 GB per init, 730 inits for the yearly panel. Not shippable.
-        "inputs": [consts.EXPERIMENTS_PATH / "base" / MAIN_INIT / "pre_backbone_embeddings.pickle"],
+        "inputs": [consts.base_rollout_path(MAIN_INIT).with_name("pre_backbone_embeddings.pickle")],
         "output": consts.FIGURES_PATH / "pca_embeddings",
     },
     {
@@ -136,13 +126,30 @@ FIGURES = [
         "inputs": [
             consts.CHECKPOINT_PATH,
             consts.BATCH_INITS_PATH / f"init_{MAIN_INIT}",
-            consts.MODEL_PATH / "sae",
+            consts.SAE_DIR,
         ],
-        "output": consts.FIGURES_PATH / "sae_feature_grid",
+        "output": consts.FIGURES_PATH / "sae_feature_grid" / "feature_grid.pdf",
+    },
+    {
+        "id": "sae_steering",
+        "paper": "Fig 7",
+        "title": "SAE feature steering (zero ablation), NO2/O3 difference maps",
+        "pre": [("run_sae_steering.py", [])],
+        "script": "plot_sae_steering_diffs.py",
+        "args": [],
+        "tier": 2,
+        "gpu": True,
+        "inputs": [
+            consts.CHECKPOINT_PATH,
+            consts.BATCH_INITS_PATH / f"init_{MAIN_INIT}",
+            consts.SAE_DIR,
+            consts.base_rollout_path(MAIN_INIT),
+        ],
+        "output": consts.FIGURES_PATH / "sae_steering",
     },
     {
         "id": "sae_examples",
-        "paper": "Fig 7 / SI",
+        "paper": "SI",
         "title": "SAE activation examples, 6x2 gallery",
         "script": "plot_sae_examples.py",
         "args": [],
@@ -151,7 +158,7 @@ FIGURES = [
         "inputs": [
             consts.CHECKPOINT_PATH,
             consts.BATCH_INITS_PATH / "init_20221101_0000",
-            consts.MODEL_PATH / "sae",
+            consts.SAE_DIR,
         ],
         "output": consts.FIGURES_PATH / "sae_examples",
     },
@@ -165,7 +172,7 @@ FIGURES = [
         "tier": 1,
         "gpu": False,
         "inputs": [_exp("single_cell_nox_beijing")],
-        "output": consts.FIGURES_PATH / "single_cell_nox",
+        "output": consts.NOX_FIGURES_PATH / "single_cell_nox",
     },
     {
         "id": "si_validate_nox",
@@ -176,7 +183,7 @@ FIGURES = [
         "tier": 1,
         "gpu": False,
         "inputs": [
-            _base(MAIN_INIT),
+            consts.base_rollout_path(MAIN_INIT),
             _exp("NOx_5ppb_increase"),
             _exp("NOx_20ppb_increase"),
         ],
@@ -197,7 +204,7 @@ def cmd_list() -> None:
     for f in FIGURES:
         print(f"{f['id']:<22} {f['paper']:<10} {f['tier']:<5} "
               f"{'yes' if f['gpu'] else '-':<4} {f['title']}")
-    print("\nTier 1 = CPU, renders from the figure-inputs bundle")
+    print("\nTier 1 = CPU, renders from the data prepare_figure_data.py produces")
     print("Tier 2 = needs a GPU (runs Aurora live)")
     print("Tier 3 = needs full-pipeline outputs (terabytes); see REPRODUCE.md")
 
@@ -227,15 +234,18 @@ def run_figure(fig: dict, dry_run: bool = False) -> bool:
         print(f"!! skipping {fig['id']}: {len(miss)} missing input(s); "
               f"first: {miss[0]}")
         return False
-    cmd = [sys.executable, str(HERE / fig["script"]), *fig["args"]]
     print(f"\n=== {fig['id']} ({fig['paper']}) — {fig['title']} ===")
-    print("    $ " + " ".join(cmd))
+    for script, args in [*fig.get("pre", []), (fig["script"], fig["args"])]:
+        cmd = [sys.executable, str(HERE / script), *args]
+        print("    $ " + " ".join(cmd))
+        if dry_run:
+            continue
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            print(f"!! {fig['id']} FAILED (exit {result.returncode})")
+            return False
     if dry_run:
         return True
-    result = subprocess.run(cmd)
-    if result.returncode != 0:
-        print(f"!! {fig['id']} FAILED (exit {result.returncode})")
-        return False
     if fig["output"]:
         print(f"    -> {fig['output']}")
     return True

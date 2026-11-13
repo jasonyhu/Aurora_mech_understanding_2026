@@ -1,31 +1,25 @@
-"""Run the base Aurora Air Pollution rollout for each init batch and save
-predictions + pre/post-backbone embeddings.
-
-Shards the inits across `task_ct` parallel tasks; run task `task_id` with:
-
-    python3 run_base_rollout.py <task_id> <task_ct>
-"""
+"""Run the base Aurora Air Pollution rollout for each validation init batch and save
+predictions + pre/post-backbone embeddings (sharded over inits by task id/count)."""
 
 import sys
-from torch.utils.data import DataLoader, Subset
+
 from tqdm import tqdm
 
-from mirora.data.aurora_batches import AuroraInitBatchesDataset
-from mirora.inference.inference import aap_rollout
+from mirora.data.loading import load_batch
+from mirora.inference.inference import aap_rollout, load_aurora
 import consts
 
-assert len(sys.argv) == 3, "INTENDED USAGE: python3 run_base_rollout.py <task_id> <task_ct>"
-task_id, task_ct = int(sys.argv[1]), int(sys.argv[2])
 
-def aurora_collate_fn(batch):
-    return batch[0]
+def main():
+    assert len(sys.argv) == 3, "INTENDED USAGE: python3 run_base_rollout.py <task_id> <task_ct>"
+    task_id, task_ct = int(sys.argv[1]), int(sys.argv[2])
 
-EXPERIMENT_DIR = consts.EXPERIMENTS_PATH / "base"
+    model, _ = load_aurora(consts.CHECKPOINT_PATH)
+    for init_time in tqdm(consts.val_init_times()[task_id::task_ct], desc=f"Task {task_id}/{task_ct}"):
+        batch = load_batch(consts.BATCH_INITS_PATH, init_time)
+        aap_rollout(batch, batch.metadata.time[0], consts.CHECKPOINT_PATH, consts.EXPERIMENTS_PATH / "base",
+                    save_backbone_activations=True, embedding_steps=1, model=model)
 
-dataset = AuroraInitBatchesDataset(consts.BATCH_INITS_PATH, consts.val_start_time, consts.val_end_time, skip_batch_check=True)
-indices = list(range(task_id, len(dataset), task_ct))
-batch_data = DataLoader(Subset(dataset, indices), collate_fn=aurora_collate_fn, num_workers=4)
 
-for batch in tqdm(batch_data, desc=f"Task {task_id}/{task_ct}"):
-    batch_time = batch.metadata.time[0]
-    result_path = aap_rollout(batch, batch_time, consts.CHECKPOINT_PATH, EXPERIMENT_DIR, save_backbone_activations=True)
+if __name__ == "__main__":
+    main()

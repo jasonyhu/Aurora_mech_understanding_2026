@@ -5,8 +5,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from mirora.config import DEFAULT_EXPANSION_FACTOR, DEFAULT_L1_COEFF
+
 class AuroraSAE(nn.Module):
-    def __init__(self, d_model: int=2048, expansion_factor: int=8, l1_coeff: float=3e-4):
+    def __init__(self, d_model: int = 2048, expansion_factor: int = DEFAULT_EXPANSION_FACTOR,
+                 l1_coeff: float = DEFAULT_L1_COEFF):
         super().__init__()
         self.d_hidden = d_model * expansion_factor
         self.l1_coeff = l1_coeff
@@ -23,9 +26,11 @@ class AuroraSAE(nn.Module):
         with torch.no_grad():
             self.W_dec.data /= self.W_dec.data.norm(dim=1, keepdim=True)
 
-    def forward(self, x):
+    def encode(self, x):
         # x shape: [Tokens, d_model]
-        x_cent = x - self.b_dec
-        h = F.relu(x_cent @ self.W_enc + self.b_enc)
+        return F.relu((x - self.b_dec) @ self.W_enc + self.b_enc)
+
+    def forward(self, x):
+        h = self.encode(x)
         x_reconstruct = h @ self.W_dec + self.b_dec
         return x_reconstruct, h

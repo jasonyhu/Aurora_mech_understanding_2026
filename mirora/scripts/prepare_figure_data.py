@@ -4,7 +4,7 @@
 The figures are built from public CAMS global atmospheric-composition forecasts
 plus the public Aurora checkpoint; no private data is required. This script
 downloads only the handful of initialisation times the figures actually use
-(7 of them, not the full validation year) and processes them into the rollouts
+(FIGURE_INITS, not the full validation year) and processes them into the rollouts
 `reproduce_figures.py` consumes.
 
     # 0. one-time: a Copernicus ADS API key in ~/.cdsapirc  (see REPRODUCE.md)
@@ -28,31 +28,26 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import consts
 from mirora.data.aurora_batches import save_init_batch, verify_init_batch
 from mirora.setup import download_cams as cams_mod
-from mirora.utils import get_init_batch_path
+from mirora.utils import get_init_batch_path, setup_logging
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout,
-                    format="%(asctime)s %(levelname)s: %(message)s")
+import consts
+
 logger = logging.getLogger(__name__)
 
 HERE = Path(__file__).resolve().parent
 
 # The only initialisations any manuscript figure depends on.
 FIGURE_INITS: dict[datetime, str] = {
-    datetime(2022, 9, 1, 0):   "main init - chemistry, ozone, SAE grid, SI",
-    datetime(2022, 8, 19, 12): "wildfire - Central Russia",
-    datetime(2022, 7, 10, 12): "wildfire - Siberia (Yakutia)",
-    datetime(2022, 7, 3, 0):   "wildfire - Alaska/Yukon",
-    datetime(2022, 9, 6, 0):   "wildfire - Amazon Basin",
-    datetime(2022, 6, 15, 12): "wildfire - Chile/Argentina",
-    datetime(2022, 11, 1, 0):  "SAE activation examples",
+    consts.MAIN_INIT_TIME: "main init - chemistry, ozone, SAE grid, steering, SI",
+    **{datetime.strptime(e["init"], r"%Y%m%d_%H%M"): f"wildfire - {e['label']}" for e in consts.FIRE_EVENTS},
+    datetime(2022, 11, 1, 0): "SAE activation examples",
 }
 
 # Rollout-producing scripts, run in this order. Each is already idempotent.
 ROLLOUT_SCRIPTS = [
-    ("rerun_single_init_perturbations.py", "base + NOx +0.5/+5/+20 ppb (2022-09-01)"),
+    ("run_nox_perturbations.py", "base + NOx +0.5/+5/+20 ppb (2022-09-01)"),
     ("run_fire_base_rollouts.py", "base rollouts for the wildfire case studies"),
     ("run_single_cell_nox.py", "single-grid-cell NOx spike (SI)"),
 ]
@@ -143,6 +138,7 @@ STEPS = {"cams": step_cams, "batches": step_batches, "rollouts": step_rollouts}
 
 
 def main() -> int:
+    setup_logging()
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)

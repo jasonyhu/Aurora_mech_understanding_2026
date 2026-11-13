@@ -6,41 +6,29 @@ Uses the GDEX subset API to request only the dates/regions needed.
 Token should be stored in ~/.gdex_token (from https://gdex.ucar.edu/accounts/profile/).
 """
 
-import json
+import logging
 import sys
 import time
-import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
-logger = logging.getLogger(__name__)
+from mirora.utils import setup_logging
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import consts
 
-FINN_DIR = consts.SCRATCH_PATH / "finn"
-FINN_DIR.mkdir(parents=True, exist_ok=True)
+logger = logging.getLogger(__name__)
+
 TOKEN_FILE = Path.home() / ".gdex_token"
 API_BASE = "https://gdex.ucar.edu/api"
+FINN_DAYS = 6
 
-# Use continental bounding boxes to cover both regional and continental views
-FIRE_EVENTS = [
-    {"name": "central_russia_aug2022", "start": "202208190000", "end": "202208250000",
-     "nlat": 75, "slat": 35, "wlon": 10, "elon": 80},
-    {"name": "siberia_yakutia_jul2022", "start": "202207100000", "end": "202207160000",
-     "nlat": 75, "slat": 40, "wlon": 90, "elon": 180},
-    {"name": "alaska_jul2022", "start": "202207030000", "end": "202207090000",
-     "nlat": 75, "slat": 40, "wlon": -170, "elon": -80},
-    {"name": "amazon_sep2022", "start": "202209060000", "end": "202209120000",
-     "nlat": 10, "slat": -35, "wlon": -85, "elon": -35},
-    {"name": "south_america_jun2022", "start": "202206150000", "end": "202206210000",
-     "nlat": -10, "slat": -55, "wlon": -85, "elon": -40},
-    {"name": "spain_jul2022", "start": "202207150000", "end": "202207210000",                                 
-   "nlat": 50, "slat": 30, "wlon": -15, "elon": 10}, 
-]
+
+def finn_window(event: dict) -> tuple[str, str]:
+    """GDEX date range (YYYYMMDDHHMM): 00 UTC of the init day to FINN_DAYS days later."""
+    start = datetime.strptime(event["init"][:8], "%Y%m%d")
+    return start.strftime("%Y%m%d0000"), (start + timedelta(days=FINN_DAYS)).strftime("%Y%m%d0000")
 
 
 def get_token() -> str:
@@ -56,15 +44,17 @@ def get_token() -> str:
 
 def submit_request(event: dict, token: str) -> str | None:
     """Submit a GDEX subset request for one fire event. Returns request index."""
+    start, end = finn_window(event)
+    slat, nlat, wlon, elon = event["bbox"]
     control = {
         "dataset": "d312009",
-        "date": f"{event['start']}/to/{event['end']}",
+        "date": f"{start}/to/{end}",
         "param": "fire_modisviirs_CO",
         "oformat": "netCDF",
-        "nlat": event["nlat"],
-        "slat": event["slat"],
-        "wlon": event["wlon"],
-        "elon": event["elon"],
+        "nlat": nlat,
+        "slat": slat,
+        "wlon": wlon,
+        "elon": elon,
         "groupindex": 2,  # MODIS+VIIRS group
     }
 
@@ -160,6 +150,8 @@ def download_request(req_idx: str, token: str, output_dir: Path) -> list[Path]:
 
 
 def main():
+    setup_logging()
+    consts.FINN_DIR.mkdir(parents=True, exist_ok=True)
     token = get_token()
     logger.info(f"Using GDEX token: {token[:8]}...")
 
@@ -172,7 +164,7 @@ def main():
 
     # Submit all requests
     requests_map = {}
-    for event in FIRE_EVENTS:
+    for event in consts.FIRE_EVENTS:
         req_idx = submit_request(event, token)
         if req_idx:
             requests_map[event["name"]] = req_idx
@@ -191,11 +183,11 @@ def main():
     # Download completed requests
     logger.info(f"\nDownloading {len(completed)} completed requests...")
     for name, req_idx in completed.items():
-        out_dir = FINN_DIR / name
+        out_dir = consts.FINN_DIR / name
         files = download_request(req_idx, token, out_dir)
         logger.info(f"  {name}: {len(files)} files downloaded to {out_dir}")
 
-    logger.info(f"\nDone. FINN data saved to {FINN_DIR}")
+    logger.info(f"\nDone. FINN data saved to {consts.FINN_DIR}")
 
 
 if __name__ == "__main__":

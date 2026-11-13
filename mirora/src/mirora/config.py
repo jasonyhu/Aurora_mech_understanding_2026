@@ -11,15 +11,14 @@ variable mappings, and grid geometry.
 ENCODER_CONFIG = [(6, 512), (10, 1024), (8, 2048)]
 DECODER_CONFIG = [(8, 2048), (10, 1024), (6, 512)]
 
-# All 48 hookable blocks: (target_decoder, stage_idx, block_idx, d_model)
-STAGES: list[tuple[bool, int, int, int]] = []
-for _stage_idx, (_n_blocks, _dim) in enumerate(ENCODER_CONFIG):
-    for _block_idx in range(_n_blocks):
-        STAGES.append((False, _stage_idx, _block_idx, _dim))
-for _stage_idx, (_n_blocks, _dim) in enumerate(DECODER_CONFIG):
-    for _block_idx in range(_n_blocks):
-        STAGES.append((True, _stage_idx, _block_idx, _dim))
-# Indices 0-23: encoder, 24-47: decoder
+# All 48 hookable blocks: (component, stage_idx, block_idx, d_model).
+# Indices 0-23: encoder, 24-47: decoder.
+STAGES: list[tuple[str, int, int, int]] = [
+    (component, stage_idx, block_idx, dim)
+    for component, config in (("encoder", ENCODER_CONFIG), ("decoder", DECODER_CONFIG))
+    for stage_idx, (n_blocks, dim) in enumerate(config)
+    for block_idx in range(n_blocks)
+]
 
 # Grid geometry
 PATCH_SIZE = 3
@@ -106,6 +105,15 @@ CHEM_ATMOS_VARS = {
 
 # 13 pressure levels in hPa
 PRESSURE_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
+SURFACE_LEVEL_IDX = 0  # 1000 hPa
+
+# Molar masses (g/mol) and mass mixing ratio (kg/kg) -> ppb (by volume) factors
+M_AIR = 28.97
+MOLAR_MASS = {"co": 28.01, "no": 30.006, "no2": 46.0055, "go3": 48.0, "so2": 64.066}
+MMR_TO_PPB = {sp: M_AIR / m * 1e9 for sp, m in MOLAR_MASS.items()}
+
+SEASON_OF_MONTH = {12: "DJF", 1: "DJF", 2: "DJF", 3: "MAM", 4: "MAM", 5: "MAM",
+                   6: "JJA", 7: "JJA", 8: "JJA", 9: "SON", 10: "SON", 11: "SON"}
 
 # ==========================================
 # SAE Defaults

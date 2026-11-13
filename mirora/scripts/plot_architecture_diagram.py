@@ -4,17 +4,17 @@ model's Swin3D backbone, showing encoder/decoder stages, skip connections,
 patch merging/splitting, and embedding dimensions.
 """
 
+import logging
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch
-import numpy as np
 
-plt.rcParams.update({
-    "mathtext.fontset": "stix",
-    "font.family": "STIXGeneral",
-    "font.size": 10,
-    "figure.facecolor": "white",
-})
+from mirora.utils import setup_logging
+from mirora.viz.maps import setup_matplotlib_style
+
+import consts
+
+logger = logging.getLogger(__name__)
 
 # Colors
 C_ENC = "#4878CF"      # encoder blue
@@ -22,7 +22,6 @@ C_DEC = "#D65F5F"      # decoder red
 C_SKIP = "#6AB572"     # skip green
 C_MERGE = "#F5A623"    # merge/split orange
 C_IO = "#9B59B6"       # input/output purple
-C_BG = "#F8F9FA"       # light background
 
 
 def draw_block(ax, x, y, w, h, label, sublabel, color, alpha=0.85):
@@ -52,6 +51,8 @@ def draw_skip(ax, x1, y1, x2, y2, label, color=C_SKIP):
 
 
 def main():
+    setup_logging()
+    setup_matplotlib_style(10)
     fig, ax = plt.subplots(figsize=(14, 7))
     ax.set_xlim(-0.5, 10.5)
     ax.set_ylim(-0.5, 6.5)
@@ -168,10 +169,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import logging
-    import sys
-    sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
-    import consts
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
     main()

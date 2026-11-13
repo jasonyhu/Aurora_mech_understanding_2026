@@ -13,20 +13,32 @@ from mirora.utils import get_rollout_dir
 
 logger = logging.getLogger(__name__)
 
-def aap_rollout(
-        batch: Batch, 
-        batch_date: datetime, 
-        aap_checkpoint_path: Path, 
-        save_dir: Path, 
-        rollout_steps: int = 10, 
-        save_backbone_activations: bool = False
-    ) -> None:
+def load_aurora(checkpoint_path: Path) -> tuple[AuroraAirPollution, torch.device]:
+    """Load AuroraAirPollution from a local checkpoint, in eval mode on the GPU if available."""
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AuroraAirPollution()
-    model.load_checkpoint_local(str(aap_checkpoint_path))
+    model.load_checkpoint_local(str(checkpoint_path))
+    return model.to(device).eval(), device
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.to(device)
-    model.eval()
+
+def aap_rollout(
+        batch: Batch,
+        batch_date: datetime,
+        aap_checkpoint_path: Path,
+        save_dir: Path,
+        rollout_steps: int = 10,
+        save_backbone_activations: bool = False,
+        embedding_steps: int | None = None,
+        model: AuroraAirPollution | None = None,
+    ) -> None:
+    """Roll out Aurora and pickle the predictions (and optionally backbone embeddings).
+
+    `embedding_steps` keeps only the first k rollout steps' embeddings (None = all).
+    Step 0 alone is what the PCA analysis reads, at ~1/10 of the disk.
+    Pass an already-loaded `model` to skip reloading the checkpoint.
+    """
+    if model is None:
+        model, _ = load_aurora(aap_checkpoint_path)
 
     pre_backbone_embeddings = []
     post_backbone_embeddings = []
@@ -59,9 +71,9 @@ def aap_rollout(
         pre_backbone_path = rollout_dir / "pre_backbone_embeddings.pickle"
         post_backbone_path = rollout_dir / "post_backbone_embeddings.pickle"
         with open(pre_backbone_path, 'wb') as pre_backbone_file:
-            pickle.dump(pre_backbone_embeddings, pre_backbone_file)
+            pickle.dump(pre_backbone_embeddings[:embedding_steps], pre_backbone_file)
         with open(post_backbone_path, 'wb') as post_backbone_file:
-            pickle.dump(post_backbone_embeddings, post_backbone_file)
+            pickle.dump(post_backbone_embeddings[:embedding_steps], post_backbone_file)
 
     with open(rollout_path, 'wb') as pred_file:
         logger.info(f"Saving to {rollout_path}")

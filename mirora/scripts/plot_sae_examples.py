@@ -1,148 +1,74 @@
 """
-Generate a 6×2 figure of L1 SAE activation examples on the Aurora backbone.
+Generate a 6×2 figure of L1 SAE activation examples on the Aurora backbone
+(1 Nov 2022 00Z init).
 
 Rows: first block of each backbone stage (encoder s0/s1/s2, decoder s0/s1/s2)
 Columns:
-  Left:  top-activating feature of that block
-  Right: arbitrary feature (index 1)
+  Left:  arbitrary feature (index 1)
+  Right: top-activating feature of that block
 
-No titles, font sizes ≥20.
+Font sizes ≥20.
 """
 
-import pickle
-import sys
 import logging
 from datetime import datetime
-from pathlib import Path
 
-import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
-from torch.utils.data import DataLoader
 
-from aurora import AuroraAirPollution
-from mirora.data.aurora_batches import AuroraInitBatchesDataset
-from mirora.interp.aurora_sae import AuroraSAE
+from mirora.config import DEFAULT_EXPANSION_FACTOR, STAGES
+from mirora.data.loading import load_batch
+from mirora.inference.inference import load_aurora
+from mirora.interp import capture_blocks, get_spatial_resolution, load_sae
+from mirora.utils import setup_logging
+from mirora.viz.maps import draw_global_field, setup_matplotlib_style
 
 import consts
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
-plt.rcParams.update({
-    "mathtext.fontset": "stix",
-    "font.family": "STIXGeneral",
-    "font.size": 20,
-    "figure.facecolor": "white",
-    "savefig.facecolor": "white",
-})
-
-SAE_DIR = consts.MODEL_PATH / "sae"
-EXPANSION = 8
 RANDOM_FEATURE_IDX = 1  # arbitrary "random" feature
 
-# (target_decoder, stage_idx, block_idx, dim, label)
-ROWS = [
-    (False, 0, 0, 512,  "Encoder S0 B0"),
-    (False, 1, 0, 1024, "Encoder S1 B0"),
-    (False, 2, 0, 2048, "Encoder S2 B0"),
-    (True,  0, 0, 2048, "Decoder S0 B0"),
-    (True,  1, 0, 1024, "Decoder S1 B0"),
-    (True,  2, 0, 512,  "Decoder S2 B0"),
-]
-
-
-def get_spatial_resolution(model, batch, target_decoder: bool, stage_idx: int) -> tuple[int, int, int]:
-    H_img = batch.metadata.lat.shape[0]
-    W_img = batch.metadata.lon.shape[0]
-    patch_res = (model.encoder.latent_levels, H_img // model.patch_size, W_img // model.patch_size)
-    all_res, _ = model.backbone.get_encoder_specs(patch_res)
-    num_stages = len(all_res)
-    res_idx = (num_stages - stage_idx - 1) if target_decoder else stage_idx
-    return all_res[res_idx]
+# First block of each stage: encoder s0/s1/s2, then decoder s0/s1/s2.
+ROWS = [(component, stage, block, dim) for component, stage, block, dim in STAGES if block == 0]
 
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    logger.info("Loading Aurora model...")
-    model = AuroraAirPollution()
-    model.load_checkpoint_local(str(consts.CHECKPOINT_PATH))
-    model = model.to(device).eval()
-
-    logger.info("Loading batch...")
-    batch_date = datetime(2022, 11, 1, 0)
-    dataset = AuroraInitBatchesDataset(consts.BATCH_INITS_PATH, start=batch_date, end=batch_date)
-    dataloader = DataLoader(dataset, batch_size=1, collate_fn=lambda x: x[0])
-    batch = next(iter(dataloader)).to(device)
-
-    # Hook all 6 target blocks at once
-    captured: dict[int, torch.Tensor] = {}
-    handles = []
-
-    def make_hook(idx):
-        def hook_fn(_m, _i, output):
-            x = output[0] if isinstance(output, tuple) else output
-            captured[idx] = x.detach()
-        return hook_fn
-
-    for idx, (target_decoder, stage_idx, block_idx, _dim, _lbl) in enumerate(ROWS):
-        if target_decoder:
-            tgt = model.backbone.decoder_layers[stage_idx].blocks[block_idx]
-        else:
-            tgt = model.backbone.encoder_layers[stage_idx].blocks[block_idx]
-        handles.append(tgt.register_forward_hook(make_hook(idx)))
+    setup_logging()
+    setup_matplotlib_style(20)
+    model, device = load_aurora(consts.CHECKPOINT_PATH)
+    batch = load_batch(consts.BATCH_INITS_PATH, datetime(2022, 11, 1, 0)).to(device)
 
     logger.info("Running forward pass...")
-    with torch.no_grad():
+    with torch.no_grad(), capture_blocks(model, [r[:3] for r in ROWS]) as captured:
         model(batch)
 
-    for h in handles:
-        h.remove()
-
-    # Process each row: load SAE, extract features
     spatial_results = []
-    for idx, (target_decoder, stage_idx, block_idx, dim, label) in enumerate(ROWS):
-        component = "decoder" if target_decoder else "encoder"
-        sae_path = SAE_DIR / f"sae_{component}_s{stage_idx}_b{block_idx}.pt"
-        logger.info(f"Loading {sae_path.name}...")
-        sae = AuroraSAE(d_model=dim, expansion_factor=EXPANSION)
-        sae.load_state_dict(torch.load(sae_path, map_location=device, weights_only=True))
-        sae = sae.to(device).eval()
-
-        x = captured[idx]  # (B, L, D)
-        D = x.shape[-1]
-        flat = x.reshape(-1, D)
+    for component, stage_idx, block_idx, dim in ROWS:
+        sae = load_sae(consts.SAE_DIR, component, stage_idx, block_idx, dim, device)
+        x = captured[(component, stage_idx, block_idx)]
+        flat = x.reshape(-1, x.shape[-1])
         with torch.no_grad():
-            _, h = sae(flat)
-        # h: (tokens, d_hidden)
+            h = sae.encode(flat)  # (tokens, d_hidden)
 
-        # Spatial resolution
-        C, H, W = get_spatial_resolution(model, batch, target_decoder, stage_idx)
+        C, H, W = get_spatial_resolution(model, batch, component, stage_idx)
         spatial = h.reshape(C, H, W, -1).mean(dim=0).cpu().numpy()  # (H, W, d_hidden)
 
-        # Top feature by per-feature variance contribution
-        # contrib_k = ||h[:, k] · W_dec[k, :]||² / ||x − b_dec||²
-        # Since W_dec rows are unit-normalized: ||h[:,k] · W_dec[k,:]||² = ||h[:,k]||²
-        # So contrib_k = sum_t h[t,k]² / ||x − b_dec||²
+        # Block-level ranking (not per-token var_contribution): a feature's total energy
+        # over all tokens / the block's total centred variance, sum_t h[t,k]² / sum_t ||x[t] − b_dec||².
         with torch.no_grad():
-            x_centered = flat - sae.b_dec
-            total_var = (x_centered ** 2).sum().item()
-            energy_per_feat = (h ** 2).sum(dim=0)  # (d_hidden,)
-            contrib_per_feat = (energy_per_feat / total_var).cpu()
+            total_var = ((flat - sae.b_dec) ** 2).sum().item()
+            contrib_per_feat = ((h ** 2).sum(dim=0) / total_var).cpu()
         top_idx = int(torch.argmax(contrib_per_feat).item())
-        top_contrib = float(contrib_per_feat[top_idx].item())
-        rand_contrib = float(contrib_per_feat[RANDOM_FEATURE_IDX].item())
         logger.info(
-            f"  Top feature: #{top_idx} (contrib={top_contrib:.4f}); "
-            f"random feature #{RANDOM_FEATURE_IDX} contrib={rand_contrib:.4f}"
+            f"  {component} s{stage_idx} b{block_idx}: top feature #{top_idx} "
+            f"(contrib={float(contrib_per_feat[top_idx]):.4f}); random feature #{RANDOM_FEATURE_IDX} "
+            f"contrib={float(contrib_per_feat[RANDOM_FEATURE_IDX]):.4f}"
         )
 
-        d_hidden = dim * EXPANSION
         spatial_results.append({
-            "label": label,
-            "d_hidden": d_hidden,
+            "d_hidden": dim * DEFAULT_EXPANSION_FACTOR,
             "top_idx": top_idx,
             "rand_idx": RANDOM_FEATURE_IDX,
             "top_map": spatial[:, :, top_idx],
@@ -167,13 +93,7 @@ def main():
             (info["top_map"], info["top_idx"]),
         ]):
             ax = axes[row, col]
-            rolled = np.roll(feat_map, feat_map.shape[1] // 2, axis=1)
-            im = ax.imshow(
-                rolled, extent=[-180, 180, -90, 90], origin="upper",
-                transform=ccrs.PlateCarree(), cmap="inferno", interpolation="nearest",
-            )
-            ax.coastlines(color="white", linewidth=0.5)
-            ax.set_global()
+            im = draw_global_field(ax, feat_map, "inferno", coast_color="white", coast_width=0.5)
             ax.set_title(f"Feature #{feat_idx} of {d_hidden}", fontsize=20, pad=8)
             cbar = fig.colorbar(im, ax=ax, shrink=0.7, pad=0.02, aspect=15)
             cbar.ax.tick_params(labelsize=20)
@@ -189,10 +109,7 @@ def main():
     plt.savefig(save_path_png, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close()
 
-    logger.info(f"Saved to {save_path_pdf}")
-    logger.info(f"Saved to {save_path_png}")
-    for r in spatial_results:
-        logger.info(f"  {r['label']}: top feature = #{r['top_idx']}, random feature = #{r['rand_idx']}")
+    logger.info(f"Saved to {save_path_pdf} and {save_path_png}")
 
 
 if __name__ == "__main__":

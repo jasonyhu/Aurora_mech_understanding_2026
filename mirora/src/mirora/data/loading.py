@@ -12,8 +12,8 @@ import numpy as np
 import xarray as xr
 from aurora import Batch
 
-from mirora.config import LATENT_LEVELS, SPATIAL_DIM
-from mirora.utils import get_rollout_dir
+from mirora.config import LATENT_LEVELS, MMR_TO_PPB, SPATIAL_DIM, SURFACE_LEVEL_IDX
+from mirora.utils import get_init_batch_path, get_rollout_dir
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,30 @@ def fetch_rollout(rollout_path: Path) -> list[Batch]:
     """Load a pickled list of Aurora Batch predictions."""
     with open(rollout_path, "rb") as f:
         return pickle.load(f)
+
+
+def surface(pred: Batch, var: str, ppb: bool = False) -> np.ndarray:
+    """[H, W] field of atmospheric variable `var` at the 1000 hPa level of one prediction,
+    as mass mixing ratio or (ppb=True) ppb by volume."""
+    field = pred.atmos_vars[var][0, 0, SURFACE_LEVEL_IDX].numpy()
+    return field * MMR_TO_PPB[var] if ppb else field
+
+
+def load_batch(batch_dir: Path, init_time: datetime) -> Batch:
+    """Load the pickled Aurora init Batch for `init_time`."""
+    with open(get_init_batch_path(batch_dir, init_time), "rb") as f:
+        return pickle.load(f)
+
+
+def available_init_times(batch_dir: Path, start: datetime, end: datetime) -> list[datetime]:
+    """Every 12-hourly init time in [start, end] that has a saved init batch."""
+    times = []
+    cur = start
+    while cur <= end:
+        if get_init_batch_path(batch_dir, cur).exists():
+            times.append(cur)
+        cur += timedelta(hours=12)
+    return times
 
 
 def load_cams_step(

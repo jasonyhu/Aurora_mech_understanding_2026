@@ -1,61 +1,36 @@
 """
-Generate static 5×2 wildfire comparison figures (CAMS left, Aurora right)
-at +24h, +48h, +72h, +96h, +120h. One figure per event per variable.
+Wildfire case-study SI figures (consts.FIRE_EVENTS), one per event per variable:
+  default          — 4x2 maps (CAMS left, Aurora right) at +24h, +48h, +72h, +96h
+                     with FINN fire detections overlaid
+  --distributions  — CAMS vs Aurora distributions inside the event bbox per lead,
+                     plus a CSV of quantiles
 """
 
 import argparse
-import pickle
-import sys
 import logging
-from pathlib import Path
+from functools import lru_cache
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import cartopy.io.shapereader as shpreader
+from shapely.geometry import Point
+from shapely.prepared import prep
 
-from mirora.data.loading import load_finn_fires
+from mirora.config import MOLAR_MASS
+from mirora.data.loading import fetch_rollout, load_finn_fires
+from mirora.utils import setup_logging
+from mirora.viz.maps import setup_matplotlib_style
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 import consts
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger(__name__)
 
-plt.rcParams.update({
-    "mathtext.fontset": "stix",
-    "font.family": "sans-serif",
-    "font.size": 20,
-    "figure.facecolor": "white",
-    "savefig.facecolor": "white",
-})
-
-FINN_DIR = consts.SCRATCH_PATH / "finn"
 FIGURES_DIR = consts.FIGURES_PATH / "fire_stills"
-FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-
-FIRE_EVENTS = [
-    {"name": "central_russia_aug2022", "label": "Central Russia",
-     "init_date": "20220819_1200", "bbox": [35, 75, 10, 80],
-     "finn_country": "Russia"},
-    {"name": "siberia_yakutia_jul2022", "label": "Siberia (Yakutia)",
-     "init_date": "20220710_1200", "bbox": [40, 75, 90, 180],
-     "finn_country": "Russia"},
-    {"name": "alaska_jul2022", "label": "Alaska/Yukon",
-     "init_date": "20220703_0000", "bbox": [40, 75, -170, -80],
-     "finn_country": None},
-    {"name": "amazon_sep2022", "label": "Amazon Basin",
-     "init_date": "20220906_0000", "bbox": [-35, 10, -85, -35],
-     "finn_country": None},
-    {"name": "south_america_jun2022", "label": "Chile/Argentina",
-     "init_date": "20220615_1200", "bbox": [-55, -10, -85, -40],
-     "finn_country": None},
-    {"name": "spain_jul2022", "label": "Spain (Iberia)",
-     "init_date": "20220715_1200", "bbox": [30, 50, -15, 10],
-     "finn_country": "Spain"},
-]
 
 # GAMAP WhGrYlRd colormap: White → Light Blue → Green → Yellow → Orange → Red
 # Matches Harvard GAMAP IDL `myct, /WhGrYlRd` palette (which interpolates through
@@ -72,24 +47,18 @@ WHGRYLRD = mcolors.LinearSegmentedColormap.from_list(
     ],
 )
 
-M_CO = 28.01  # g/mol — molar mass of carbon monoxide
 
 SPECIES = {
     # CAMS native units: kg m^-2. Convert kg/m² → mol/m² via × (1000 g/kg) / (M_CO g/mol).
-    "tcco": {"label": "Total Column CO (mol m$^{-2}$)", "cmap": WHGRYLRD, "scale": 1000.0 / M_CO},
+    "tcco": {"label": "Total Column CO (mol m$^{-2}$)", "cmap": WHGRYLRD, "scale": 1000.0 / MOLAR_MASS["co"]},
     # PM2.5 is a particulate mass concentration; mol doesn't apply, leave as g/m³.
     "pm2p5": {"label": "Surface PM$_{2.5}$ (g m$^{-3}$)", "cmap": WHGRYLRD, "scale": 1000.0},
 }
 
 
-# --- Country geometry filter (Natural Earth country borders) ---------------
-import cartopy.io.shapereader as shpreader
-from shapely.geometry import Point
-from shapely.prepared import prep
-
-
-def _load_country_geom(country_name: str):
-    """Load a country's polygon from Natural Earth (50m resolution)."""
+@lru_cache
+def _prepared_country_geom(country_name: str):
+    """A country's polygon from Natural Earth (50m resolution), prepared for point tests."""
     shp_path = shpreader.natural_earth(
         resolution="50m", category="cultural", name="admin_0_countries"
     )
@@ -98,11 +67,8 @@ def _load_country_geom(country_name: str):
         attrs = record.attributes
         for key in ("NAME", "NAME_EN", "ADMIN"):
             if attrs.get(key) == country_name:
-                return record.geometry
+                return prep(record.geometry)
     raise RuntimeError(f"{country_name} geometry not found in Natural Earth dataset")
-
-
-_COUNTRY_PREPARED_CACHE: dict[str, "prep"] = {}
 
 
 def get_finn_country_filter(country_name: str | None):
@@ -112,9 +78,7 @@ def get_finn_country_filter(country_name: str | None):
     """
     if country_name is None:
         return lambda lats, lons: (lats, lons)
-    if country_name not in _COUNTRY_PREPARED_CACHE:
-        _COUNTRY_PREPARED_CACHE[country_name] = prep(_load_country_geom(country_name))
-    prepared = _COUNTRY_PREPARED_CACHE[country_name]
+    prepared = _prepared_country_geom(country_name)
 
     def _filter(fire_lats: np.ndarray, fire_lons: np.ndarray):
         mask = np.array([
@@ -125,22 +89,22 @@ def get_finn_country_filter(country_name: str | None):
 
     return _filter
 
-# Steps corresponding to +24h, +48h, +72h, +96h
-STEPS = [1, 3, 5, 7]
-STEP_LABELS = ["+24h", "+48h", "+72h", "+96h"]
+
+def lead_label(step: int) -> str:
+    return f"+{12 * (step + 1)}h"
+
+
+def cams_sfc_path(event: dict):
+    return consts.CAMS_DATA_PATH / f"cams_{event['init']}" / "data_sfc.nc"
+
+
+STEPS = [1, 3, 5, 7]  # +24h, +48h, +72h, +96h
 
 
 def generate_fire_still(event: dict, var_key: str, var_info: dict):
-    init_str = event["init_date"]
     lat_min, lat_max, lon_min, lon_max = event["bbox"]
-
-    # Load Aurora predictions
-    pred_path = consts.EXPERIMENTS_PATH / "base" / init_str / "predictions.pickle"
-    with open(pred_path, "rb") as f:
-        preds = pickle.load(f)
-
-    # Load CAMS data
-    cams_ds = xr.open_dataset(consts.CAMS_DATA_PATH / f"cams_{init_str}" / "data_sfc.nc")
+    preds = fetch_rollout(consts.base_rollout_path(event["init"]))
+    cams_ds = xr.open_dataset(cams_sfc_path(event))
 
     scale = var_info.get("scale", 1.0)
 
@@ -193,7 +157,7 @@ def generate_fire_still(event: dict, var_key: str, var_info: dict):
     cmap = plt.get_cmap(cmap_input).copy() if isinstance(cmap_input, str) else cmap_input
     im = None
 
-    for row_idx, (step, step_label) in enumerate(zip(STEPS, STEP_LABELS)):
+    for row_idx, step in enumerate(STEPS):
         valid_time = preds[step].metadata.time[0]
 
         # CAMS
@@ -207,7 +171,7 @@ def generate_fire_still(event: dict, var_key: str, var_info: dict):
         aurora_lons = preds[step].metadata.lon.numpy()
 
         # FINN fires for this date
-        finn = load_finn_fires(FINN_DIR, event["name"], valid_time)
+        finn = load_finn_fires(consts.FINN_DIR, event["name"], valid_time)
 
         for col_idx, (field, lats, lons, panel_title) in enumerate([
             (cams_field, cams_lats, cams_lons, "CAMS" if row_idx == 0 else ""),
@@ -256,13 +220,66 @@ def generate_fire_still(event: dict, var_key: str, var_info: dict):
     logger.info(f"Saved {save_path.name}")
 
 
+DIST_STEPS = [0, 1, 3, 5, 7, 9]  # +12h .. +120h
+
+
+def generate_fire_distribution(event: dict, var_key: str, var_info: dict):
+    """SI figure: CAMS vs Aurora distribution of `var_key` inside the event bbox at each
+    lead time (log-density, to show the high-concentration tail), plus a CSV of quantiles."""
+    lat_min, lat_max, lon_min, lon_max = event["bbox"]
+    preds = fetch_rollout(consts.base_rollout_path(event["init"]))
+    cams_ds = xr.open_dataset(cams_sfc_path(event))
+    scale = var_info.get("scale", 1.0)
+
+    lat = preds[0].metadata.lat.numpy()
+    lon = (preds[0].metadata.lon.numpy() + 180) % 360 - 180  # 0..360 -> -180..180
+    box = ((lat >= lat_min) & (lat <= lat_max))[:, None] & ((lon >= lon_min) & (lon <= lon_max))[None, :]
+
+    fields = {}
+    for step in DIST_STEPS:
+        cams = cams_ds[var_key].isel(forecast_period=step + 1, forecast_reference_time=0).values[: len(lat)] * scale
+        fields[step] = (cams[box], preds[step].surf_vars[var_key][0, 0].numpy()[box] * scale)
+    cams_ds.close()
+
+    pooled = np.concatenate([x for pair in fields.values() for x in pair])
+    bins = np.linspace(*np.nanpercentile(pooled, [0.01, 99.99]), 60)  # covers both sources
+    fig, axs = plt.subplots(2, 3, figsize=(18, 10), sharex=True, sharey=True, layout="constrained")
+    rows = []
+    for ax, step in zip(axs.flat, DIST_STEPS):
+        label = lead_label(step)
+        cams, aurora = fields[step]
+        ax.hist(cams, bins=bins, density=True, histtype="step", linewidth=2.5, color="#2d2d2d", label="CAMS")
+        ax.hist(aurora, bins=bins, density=True, histtype="step", linewidth=2.5, color="#C44E52", label="Aurora")
+        ax.set_yscale("log")
+        ax.set_title(label, fontsize=22)
+        ax.tick_params(labelsize=20)
+        for name, x in (("CAMS", cams), ("Aurora", aurora)):
+            q = np.nanpercentile(x, [50, 90, 99, 100])
+            rows.append({"event": event["name"], "lead": label, "source": name,
+                         "p50": q[0], "p90": q[1], "p99": q[2], "max": q[3]})
+    axs[0, 0].legend(fontsize=20, frameon=False)
+    fig.supxlabel(var_info["label"], fontsize=22)
+    fig.supylabel("Probability density", fontsize=22)
+
+    out_dir = FIGURES_DIR / "distributions"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / f"{event['name']}_{var_key}_distribution.pdf", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    pd.DataFrame(rows).to_csv(out_dir / f"{event['name']}_{var_key}_quantiles.csv", index=False)
+    logger.info(f"  {event['name']}: distribution + quantiles saved to {out_dir}")
+
+
 def main():
+    setup_logging()
+    setup_matplotlib_style(20, family="sans-serif")
     parser = argparse.ArgumentParser()
     parser.add_argument("--event", help="Only generate for this event name")
     parser.add_argument("--var", help="Only generate for this variable key (tcco / pm2p5)")
+    parser.add_argument("--distributions", action="store_true",
+                        help="Plot CAMS vs Aurora distributions per lead (SI figure) instead of the map stills")
     args = parser.parse_args()
 
-    events = [e for e in FIRE_EVENTS if args.event is None or e["name"] == args.event]
+    events = [e for e in consts.FIRE_EVENTS if args.event is None or e["name"] == args.event]
     species = {k: v for k, v in SPECIES.items() if args.var is None or k == args.var}
     if args.event and not events:
         raise SystemExit(f"Unknown event: {args.event}")
@@ -272,7 +289,10 @@ def main():
     for event in events:
         for var_key, var_info in species.items():
             logger.info(f"Generating {event['label']} — {var_key}...")
-            generate_fire_still(event, var_key, var_info)
+            if args.distributions:
+                generate_fire_distribution(event, var_key, var_info)
+            else:
+                generate_fire_still(event, var_key, var_info)
 
     logger.info(f"\nFire stills saved to {FIGURES_DIR}")
 

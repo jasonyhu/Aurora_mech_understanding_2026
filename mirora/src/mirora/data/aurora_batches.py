@@ -27,16 +27,6 @@ def verify_init_batch(batch_path: Path) -> bool:
     else:
         return True
 
-def verify_all_init_batches(dir_path: Path, start: datetime, end: datetime) -> None:
-    """
-    Checks that all batches between `start` and `end` (inclusive) exist in the `dir_path` directory.
-    """
-    cur_time = start
-    while cur_time <= end:
-        batch_path = get_init_batch_path(dir_path, cur_time)
-        verify_init_batch(batch_path)
-        cur_time += timedelta(hours=12)
-
 def load_saved_cams_forecast(dir_path: Path, init_time: datetime, forecast_period: int=0) -> tuple[xr.Dataset, xr.Dataset]:
     """
     Loads the CAMS forecast initialized at `init_time` saved in the `dir_path` directory. 
