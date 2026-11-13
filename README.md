@@ -7,28 +7,16 @@ Jason Y. Hu, Ivan Higuera-Mendieta, Patrick Obin Sturm, Makoto M. Kelp
 
 ---
 
-We apply mechanistic interpretability methods — sparse autoencoders (SAEs) and PCA of internal representations — to Microsoft's
-[Aurora](https://github.com/microsoft/aurora) foundation model fine-tuned for
-atmospheric chemistry (Aurora Air Pollution), and probe its learned chemistry with targeted perturbation experiments:
+We apply mechanistic interpretability methods to the
+[Aurora](https://github.com/microsoft/aurora) earth system foundation model, 
+focusing on the checkpoint which has been fine-tuned for atmospheric chemistry 
+(Aurora Air Pollution), and we probe its learned chemistry with targeted perturbation experiments.
 
-- **NOx -> ozone titration.** Uniform NOx perturbations (+0.5/+5/+20 ppb) reproduce
-  the expected short-term ozone suppression under NOx-saturated conditions.
-- **Wildfire case studies.** Three 2022 fire events (Spain, Alaska, Central Russia)
-  compared against CAMS, with FINN fire detections overlaid.
-- **Sparse autoencoders.** 48 SAEs (one per Swin3D backbone block) trained on
-  backbone activations, with feature galleries and steering experiments.
-- **Representation structure.** PCA of pre-/post-backbone embeddings recovers
-  day/night and transport structure.
-
-## Reproducing the figures
-
-See **[REPRODUCE.md](REPRODUCE.md)**. Each script in `mirora/scripts/` is named after
-the figure or table it produces; the full map is in
-[`mirora/scripts/README.md`](mirora/scripts/README.md).
+See **[REPRODUCE.md](REPRODUCE.md)** for instructions to reproduce the figures.
 
 ```bash
 cd mirora && pip install -e ".[all]" && cd ..
-export MIRORA_SCRATCH=/somewhere/with/space/mirora
+export MIRORA_SCRATCH=/path/to/scratch/folder
 
 python3 mirora/scripts/prepare_figure_data.py --all   # fetch + process public data
 python3 mirora/scripts/reproduce_figures.py --check   # confirm inputs
@@ -44,10 +32,10 @@ from mirora.data import load_batch, fetch_rollout, surface
 from mirora.experiments import perturb_batch
 ```
 
-## Trained sparse autoencoders
+## AuroraScope
 
-The 48 SAEs (8× expansion, one per hookable backbone block) are released on
-HuggingFace: [**hujason/aurorascope**](https://huggingface.co/hujason/aurorascope).
+AuroraScope, a suite of 48 trained SAEs trained on the Aurora backbone, can be found on
+HuggingFace at [**hujason/aurorascope**](https://huggingface.co/hujason/aurorascope).
 
 ```bash
 python3 mirora/scripts/download_aurorascope_saes.py
@@ -55,16 +43,14 @@ python3 mirora/scripts/download_aurorascope_saes.py
 
 ## Data sources
 
-| Source | Used for |
-|---|---|
-| [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts) | Model inputs + evaluation baseline |
-| [Aurora Air Pollution checkpoint](https://huggingface.co/microsoft/aurora) | The model under study |
-| [FINN v2.5 fire emissions](https://gdex.ucar.edu/) (NCAR GDEX) | Wildfire figure overlays |
+- [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts)
+- [Aurora Air Pollution checkpoint](https://huggingface.co/microsoft/aurora)
+- [FINN v2.5 fire emissions](https://gdex.ucar.edu/) (NCAR GDEX)
 
 ## Citation
 
 ```bibtex
-@misc{hu2026mechanisticinterpretabilityaifoundation,
+@misc{hu2026aurora,
       title={Toward Mechanistic Interpretability of an AI Foundation Model Fine-Tuned for Atmospheric Chemistry},
       author={Jason Y. Hu and Ivan Higuera-Mendieta and Patrick Obin Sturm and Makoto M. Kelp},
       year={2026},

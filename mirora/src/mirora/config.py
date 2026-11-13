@@ -11,7 +11,7 @@ variable mappings, and grid geometry.
 ENCODER_CONFIG = [(6, 512), (10, 1024), (8, 2048)]
 DECODER_CONFIG = [(8, 2048), (10, 1024), (6, 512)]
 
-# All 48 hookable blocks: (component, stage_idx, block_idx, d_model).
+# 48 hookable blocks: (component, stage_idx, block_idx, d_model).
 # Indices 0-23: encoder, 24-47: decoder.
 STAGES: list[tuple[str, int, int, int]] = [
     (component, stage_idx, block_idx, dim)
@@ -23,10 +23,10 @@ STAGES: list[tuple[str, int, int, int]] = [
 # Grid geometry
 PATCH_SIZE = 3
 LATENT_LEVELS = 4
-GRID_H, GRID_W = 451, 900            # raw CAMS grid
+GRID_H, GRID_W = 451, 900            # CAMS grid
 PATCH_H, PATCH_W = 150, 300          # after patching
 SPATIAL_DIM = PATCH_H * PATCH_W      # 45,000 tokens per latent level
-TOTAL_TOKENS = LATENT_LEVELS * SPATIAL_DIM  # 180,000
+TOTAL_TOKENS = LATENT_LEVELS * SPATIAL_DIM
 
 # Backbone embedding dimensions
 PRE_BACKBONE_DIM = 512

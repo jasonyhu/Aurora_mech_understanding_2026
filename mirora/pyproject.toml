@@ -11,11 +11,7 @@ license = "MIT"
 
 keywords = [
     "mechanistic interpretability",
-    "sparse autoencoder",
-    "earth system science",
-    "foundation models",
     "air pollution",
-    "weather prediction",
 ]
 
 authors = [

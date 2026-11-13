@@ -1,6 +1,4 @@
 """Path conventions for CAMS forecasts, init batches, and rollouts, plus script logging.
-
-Variable name mappings between CAMS and Aurora live in :mod:`mirora.config`.
 """
 
 import logging

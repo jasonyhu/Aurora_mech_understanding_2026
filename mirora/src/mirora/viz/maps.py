@@ -61,7 +61,6 @@ def draw_global_field(
 
     Rolls Aurora's 0..360 longitudes to -180..180 (unless roll=False), adds
     coastlines (and optionally country borders) and hides the ticks.
-    Returns the image, for a colorbar.
     """
     im = ax.imshow(
         roll_lon(field) if roll else field,

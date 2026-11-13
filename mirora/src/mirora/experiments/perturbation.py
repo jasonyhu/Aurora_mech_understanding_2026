@@ -34,7 +34,7 @@ def perturb_batch(
             if var in batch.surf_vars:
                 batch.surf_vars[var] = batch.surf_vars[var] + value
     else:
-        # Auto-estimate total column perturbation for NOx
+        # Estimate total column perturbation for NOx
         tc_mapping = {"no": "tc_no", "no2": "tcno2"}
         for atmos_var, tc_var in tc_mapping.items():
             if atmos_var in atmos_vars and tc_var in batch.surf_vars:

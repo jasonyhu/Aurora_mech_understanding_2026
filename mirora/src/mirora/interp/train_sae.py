@@ -101,7 +101,7 @@ def train(
     expansion_factor: int = DEFAULT_EXPANSION_FACTOR,
     l1_coeff: float = DEFAULT_L1_COEFF,
 ):
-    """Train one L1 SAE per backbone block (or only block `stage_idx` of config.STAGES),
+    """Train one SAE per backbone block (or only block `stage_idx` of config.STAGES),
     writing checkpoints to `save_dir/sae/`."""
     num_workers = len(os.sched_getaffinity(0))
     dataset = AuroraInitBatchesDataset(save_dir=batch_inits_dir, start=start, end=end)

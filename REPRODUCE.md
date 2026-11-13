@@ -1,6 +1,4 @@
-# Reproducing the manuscript figures
-
-All data in the project is public: CAMS global atmospheric-composition forecasts (Copernicus) and the public Aurora Air Pollution checkpoint.
+# Reproducing figures
 
 There are two starter scripts to reproduce the figures of the paper:
 ```bash
@@ -20,30 +18,19 @@ git clone https://github.com/jasonyhu/Aurora_mech_understanding_2026.git && cd A
 cd mirora && pip install -e ".[all]" && cd ..
 ```
 
-## 2. Choose a storage location
+## 2. Choose a folder to use as scratch
 
 Set one environment variable:
 
 ```bash
-export MIRORA_SCRATCH=/path/to/mirora   # needs ~60 GB
+export MIRORA_SCRATCH=/path/to/scratch/folder
 ```
 
-The Aurora checkpoint and the SAEs are fetched through HuggingFace, which caches
-to `~/.cache/huggingface` by default. If your home directory is small, point the
-cache at the same volume:
+## 3. Fetch data
 
-```bash
-export HF_HOME=$MIRORA_SCRATCH/.cache
-```
+**Copernicus ADS (CAMS forecasts)**
 
-## 3. Credentials for the public data
-
-**Copernicus ADS (CAMS forecasts).** Free account, then put your key in
-`~/.cdsapirc`:
-
-- Register: https://ads.atmosphere.copernicus.eu/
-- API key instructions: https://ads.atmosphere.copernicus.eu/how-to-api
-- Dataset used: [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts)
+Dataset used: [CAMS global atmospheric composition forecasts](https://ads.atmosphere.copernicus.eu/datasets/cams-global-atmospheric-composition-forecasts)
   (variables and lead times are set in `mirora/src/mirora/setup/download_cams.py`)
 
 **Aurora checkpoint and sparse autoencoders**:
@@ -52,15 +39,11 @@ export HF_HOME=$MIRORA_SCRATCH/.cache
 # Aurora Air Pollution checkpoint (microsoft/aurora)
 python3 -c "import sys; sys.path.insert(0,'mirora/scripts'); import consts; consts.ensure_checkpoint()"
 
-# download 48 trained sparse autoencoders (hujason/aurorascope)
+# download AuroraScope
 python3 mirora/scripts/download_aurorascope_saes.py
 ```
 
-**FINN fire emissions**: create a free NCAR GDEX
-account; the script prompts for an API token on first run and saves it to
-`~/.gdex_token`:
-
-- Get a token: https://gdex.ucar.edu/accounts/profile/
+**FINN emissions**: https://gdex.ucar.edu/accounts/profile/
 
 ```bash
 python3 mirora/scripts/download_finn_fire_emissions.py
@@ -69,11 +52,11 @@ python3 mirora/scripts/download_finn_fire_emissions.py
 ## 4. Fetch and process the data
 
 ```bash
-python3 mirora/scripts/prepare_figure_data.py --list-inits   # what it will fetch
+python3 mirora/scripts/prepare_figure_data.py --list-inits
 python3 mirora/scripts/prepare_figure_data.py --all
 ```
 
-The figures depend on only **5 initialisation times**, not the full validation year, so this downloads 10 CAMS forecasts (each init requires two timesteps).
+The figures depend on only 5 initialisation times, not the full validation year, so this downloads 10 CAMS forecasts (each init requires two timesteps).
 
 ## 5. Render the figures
 
@@ -83,12 +66,12 @@ python3 mirora/scripts/reproduce_figures.py --all
 ```
 
 Figures are written under `$MIRORA_SCRATCH/figures/`; the NOx-perturbation figures go to
-`figures/nox_mmr/` (see the NOx unit convention in [`mirora/scripts/README.md`](mirora/scripts/README.md)).
+`figures/nox_mmr/`.
 
 ```bash
-reproduce_figures.py --list                        # every figure, tier, GPU need
-reproduce_figures.py --figure ozone_perturbation   # just one
-reproduce_figures.py --tier 1                      # only the CPU-only figures
+reproduce_figures.py --list
+reproduce_figures.py --figure ozone_perturbation
+reproduce_figures.py --tier 1
 reproduce_figures.py --dry-run --all
 ```
 
@@ -104,10 +87,6 @@ To rebuild everything from scratch, follow the numbered runbook in
 3. `run_base_rollouts_with_embeddings.py` — rollouts + first-step backbone embeddings (the ~2.5 TB step)
 4. `train_aurorascope_saes.py` — train the 48 sparse autoencoders (~3 h each on one GPU)
 5. `reproduce_figures.py --all`
-
-Steps 1–4 shard their work across parallel tasks and take `<task_id> <task_ct>`
-as positional arguments — run them serially with `0 1`, or launch tasks
-`0..N-1` concurrently.
 ---
 
 ## Citation

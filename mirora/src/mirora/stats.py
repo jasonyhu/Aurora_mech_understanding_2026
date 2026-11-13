@@ -1,5 +1,5 @@
 """
-Area-weighted statistics on Aurora's regular lat-lon grid.
+Area-weighted statistics on Aurora's grid.
 """
 
 import numpy as np
@@ -22,7 +22,7 @@ def wmean(mask_or_field: np.ndarray, w_row: np.ndarray) -> float:
 
 
 def agreement(a: np.ndarray, c: np.ndarray, ok: np.ndarray, w_cells: np.ndarray) -> dict:
-    """Pearson r, Spearman rho, RMSE (raw and area-weighted) of a vs c over cells `ok`."""
+    """Pearson r, Spearman rho, RMSE (raw and area-weighted) of a vs c over `ok` cells."""
     a, c, w = a[ok], c[ok], w_cells[ok]
     f = np.isfinite(a) & np.isfinite(c)
     a, c, w = a[f], c[f], w[f]
